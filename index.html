@@ -7,13 +7,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="接客時間管理">
-<link rel="manifest" href="./manifest.webmanifest?v=210t">
+<link rel="manifest" href="./manifest.webmanifest?v=211t">
 <link rel="apple-touch-icon" href="../icon-180.png">
-<link rel="stylesheet" href="./style.css?v=210t">
+<link rel="stylesheet" href="./style.css?v=211t">
 <title>接客時間管理</title>
 </head>
 <body>
-<div id="alertToast" class="alert-toast" role="status" aria-live="assertive"></div>
+<div id="alertToast" class="alert-toast" role="alert" aria-live="assertive" aria-hidden="true"><div id="alertToastText"></div><div class="alert-toast-hint">↑ 上にスワイプして閉じる</div></div>
 <div class="app">
   <div class="topbar">
     <div>
@@ -25,11 +25,11 @@
         <button id="historyBtn" class="btn" type="button">本日の履歴</button>
         <button id="moveBtn" class="btn" type="button">席移動</button>
         <button id="linkBtn" class="btn" type="button">卓を連結</button>
-        <button id="notifyBtn" class="btn" type="button">通知ON</button>
+        <label class="alert-setting" for="alertToggle"><span>アラート</span><button id="alertToggle" class="switch" type="button" role="switch" aria-checked="false" aria-label="アラート"><span class="switch-knob"></span></button></label>
         <button id="testToolsBtn" class="btn" type="button">テスト補助</button>
         <button id="resetBtn" class="btn" type="button">今日をリセット</button>
       </div>
-      <button id="versionBtn" class="version" type="button">Ver.2.1 TEST</button>
+      <button id="versionBtn" class="version" type="button">Ver.2.1.1 TEST</button>
     </div>
   </div>
 
@@ -71,6 +71,10 @@
 <dialog id="versionDialog">
   <div class="dialog-body">
     <h3>更新履歴</h3>
+    <div class="history-card">
+      <div class="history-title">Ver.2.1.1 TEST</div>
+      <div class="history-sub">アラートON/OFFスイッチ／通常の警告音／通知を手動スワイプまで保持</div>
+    </div>
     <div class="history-card">
       <div class="history-title">Ver.2.1 TEST</div>
       <div class="history-sub">9分警告／1時間45分警告／鍋温め5分30秒アラート／席移動をテスト追加</div>
@@ -146,6 +150,6 @@
   </div>
 </dialog>
 
-<script src="./app.js?v=210t"></script>
+<script src="./app.js?v=211t"></script>
 </body>
 </html>

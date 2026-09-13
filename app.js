@@ -292,72 +292,102 @@ function confirmMove(){
   state.groups.sort((a,b)=>a.representative_table-b.representative_table);
   save();document.getElementById("moveDialog").close();render();
 }
-function beep(){
+function primeAudio(){
   try{
     audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
     if(audioCtx.state==="suspended")audioCtx.resume();
-    const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
-    osc.connect(gain);gain.connect(audioCtx.destination);
-    osc.frequency.value=880;gain.gain.value=.16;
-    osc.start();gain.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.45);osc.stop(audioCtx.currentTime+.45);
   }catch{}
 }
-async function enableNotifications(){
-  beep();
-  const btn=document.getElementById("notifyBtn");
-  if(!("Notification" in window)){
-    btn.textContent="音ON";btn.classList.add("notify-on");
-    alert("この端末ではブラウザ通知に対応していません。アプリを開いている間の通知音は有効にしました。");
-    return;
+function alertEnabled(){return localStorage.getItem(ALERT_KEY)==="1"}
+function setAlertEnabled(on){
+  localStorage.setItem(ALERT_KEY,on?"1":"0");
+  syncAlertToggle();
+}
+function syncAlertToggle(){
+  const b=document.getElementById("alertToggle");
+  if(!b)return;
+  const on=alertEnabled();
+  b.classList.toggle("on",on);
+  b.setAttribute("aria-checked",on?"true":"false");
+}
+async function toggleAlerts(){
+  const next=!alertEnabled();
+  if(!next){setAlertEnabled(false);hideToast();return}
+  primeAudio();
+  setAlertEnabled(true);
+  if("Notification" in window&&Notification.permission==="default"){
+    try{await Notification.requestPermission()}catch{}
   }
+  playAlertSound();
+  showToast("アラートをONにしました");
+}
+function playAlertSound(){
+  if(!alertEnabled())return;
   try{
-    const result=await Notification.requestPermission();
-    if(result==="granted"){
-      btn.textContent="通知ON";btn.classList.add("notify-on");
-      showSystemNotification("接客時間管理",{body:"鍋温め5分30秒アラートを有効にしました。",tag:"notify-enabled"});
-    }else{
-      btn.textContent="音ON";btn.classList.add("notify-on");
-      alert("通知の許可がないため、アプリを開いている間は通知音でお知らせします。");
-    }
-  }catch{
-    btn.textContent="音ON";btn.classList.add("notify-on");
-  }
+    primeAudio();
+    if(!audioCtx)return;
+    const now=audioCtx.currentTime;
+    [0,.22,.44].forEach((offset,i)=>{
+      const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+      osc.connect(gain);gain.connect(audioCtx.destination);
+      osc.type="sine";osc.frequency.value=i===2?1046:880;
+      gain.gain.setValueAtTime(.0001,now+offset);
+      gain.gain.exponentialRampToValueAtTime(.20,now+offset+.015);
+      gain.gain.exponentialRampToValueAtTime(.0001,now+offset+.16);
+      osc.start(now+offset);osc.stop(now+offset+.18);
+    });
+  }catch{}
 }
 function showToast(text){
+  if(!alertEnabled())return;
+  const toast=document.getElementById("alertToast");
+  const textEl=document.getElementById("alertToastText");
+  if(!toast||!textEl)return;
+  textEl.textContent=text;
+  toast.classList.add("show");
+  toast.setAttribute("aria-hidden","false");
+}
+function hideToast(){
   const toast=document.getElementById("alertToast");
   if(!toast)return;
-  toast.textContent=text;toast.classList.add("show");
-  clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>toast.classList.remove("show"),7000);
+  toast.classList.remove("show");
+  toast.setAttribute("aria-hidden","true");
+}
+function initToastSwipe(){
+  const toast=document.getElementById("alertToast");
+  if(!toast)return;
+  let startY=null;
+  toast.addEventListener("pointerdown",e=>{startY=e.clientY;try{toast.setPointerCapture(e.pointerId)}catch{}});
+  toast.addEventListener("pointerup",e=>{if(startY!==null&&e.clientY-startY<-28)hideToast();startY=null});
+  toast.addEventListener("pointercancel",()=>{startY=null});
 }
 async function showSystemNotification(title,options){
+  if(!alertEnabled())return;
   try{
+    const opts={...options,requireInteraction:true,silent:false};
     if("serviceWorker" in navigator){
       const reg=await navigator.serviceWorker.ready;
-      if(reg&&reg.showNotification){await reg.showNotification(title,options);return}
+      if(reg&&reg.showNotification){await reg.showNotification(title,opts);return}
     }
-    if("Notification" in window)new Notification(title,options);
+    if("Notification" in window&&Notification.permission==="granted")new Notification(title,opts);
   }catch{}
 }
 function sendPotAlert(g){
+  if(!alertEnabled())return false;
   const text=tableLabel(g)+"の鍋温めから5分30秒経過しました";
-  showToast(text);beep();
-  if(navigator.vibrate)try{navigator.vibrate([250,120,250])}catch{}
+  showToast(text);playAlertSound();
   if("Notification" in window&&Notification.permission==="granted")showSystemNotification("鍋温めアラート",{body:text,tag:"pot-"+g.id,renotify:true});
+  return true;
 }
 function checkPotAlerts(){
   let changed=false;
   for(const g of state.groups){
     if(g.pot_warm_at&&!g.pot_finish_at&&!g.checkout_at&&(Date.now()-new Date(g.pot_warm_at).getTime()>=330000)&&g.pot_warm_alerted_at!==g.pot_warm_at){
-      g.pot_warm_alerted_at=g.pot_warm_at;changed=true;sendPotAlert(g);
+      if(sendPotAlert(g)){g.pot_warm_alerted_at=g.pot_warm_at;changed=true}
     }
   }
   if(changed)save();
 }
-function syncNotifyButton(){
-  const btn=document.getElementById("notifyBtn");
-  if("Notification" in window&&Notification.permission==="granted"){btn.textContent="通知ON";btn.classList.add("notify-on")}
-}
-
 
 function ago(ms){return new Date(Date.now()-ms).toISOString()}
 function openTestTools(){document.getElementById("testToolsDialog").showModal()}
@@ -374,6 +404,8 @@ function testArrivalWarning(){
   state=freshState();state.groups[5].arrival_at=ago(106*60*1000);save();render();document.getElementById("testToolsDialog").close();
 }
 function testPotAlert(){
+  if(!alertEnabled())setAlertEnabled(true);
+  primeAudio();
   state=freshState();state.groups[2].pot_warm_at=ago(6*60*1000);state.groups[2].pot_warm_alerted_at=null;save();document.getElementById("testToolsDialog").close();checkPotAlerts();render();
 }
 function testReset(){state=freshState();save();render();document.getElementById("testToolsDialog").close()}
@@ -385,7 +417,7 @@ document.getElementById("resetBtn").onclick=resetToday;
 document.getElementById("versionBtn").onclick=()=>document.getElementById("versionDialog").showModal();
 document.getElementById("confirmLinkBtn").onclick=confirmLink;
 document.getElementById("confirmMoveBtn").onclick=confirmMove;
-document.getElementById("notifyBtn").onclick=enableNotifications;
+document.getElementById("alertToggle").onclick=toggleAlerts;
 document.getElementById("testToolsBtn").onclick=openTestTools;
 document.getElementById("testNineBtn").onclick=testNineWarnings;
 document.getElementById("testArrivalBtn").onclick=testArrivalWarning;
@@ -425,7 +457,8 @@ if("serviceWorker" in navigator){
   document.getElementById("reservationClearBtn").onclick=clearReservation;
 })();
 
-syncNotifyButton();
+syncAlertToggle();
+initToastSwipe();
 checkPotAlerts();
 render();
 })();

@@ -1,10 +1,10 @@
-const CACHE='service-time-local-v210-test-20260913';
+const CACHE='service-time-local-v211-test-20260913';
 const ASSETS=[
   './',
   './index.html',
-  './style.css?v=210t',
-  './app.js?v=210t',
-  './manifest.webmanifest?v=210t'
+  './style.css?v=211t',
+  './app.js?v=211t',
+  './manifest.webmanifest?v=211t'
 ];
 self.addEventListener('install',event=>{
   self.skipWaiting();
@@ -13,7 +13,7 @@ self.addEventListener('install',event=>{
 self.addEventListener('activate',event=>{
   event.waitUntil((async()=>{
     const keys=await caches.keys();
-    await Promise.all(keys.filter(key=>key!==CACHE && key.startsWith('service-time-local-v210-test')).map(key=>caches.delete(key)));
+    await Promise.all(keys.filter(key=>key!==CACHE && key.startsWith('service-time-local-v21')).map(key=>caches.delete(key)));
     await self.clients.claim();
   })());
 });
