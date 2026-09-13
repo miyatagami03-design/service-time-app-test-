@@ -315,9 +315,6 @@ async function toggleAlerts(){
   if(!next){setAlertEnabled(false);hideToast();return}
   primeAudio();
   setAlertEnabled(true);
-  if("Notification" in window&&Notification.permission==="default"){
-    try{await Notification.requestPermission()}catch{}
-  }
   playAlertSound();
   showToast("アラートをONにしました");
 }
@@ -327,14 +324,20 @@ function playAlertSound(){
     primeAudio();
     if(!audioCtx)return;
     const now=audioCtx.currentTime;
-    [0,.22,.44].forEach((offset,i)=>{
+    // 店内で気づきやすい、長め・大きめの警告音（約3.4秒）
+    const tones=[
+      [0.00,880,.36],[0.42,1046,.36],[0.84,880,.36],[1.26,1046,.36],
+      [1.82,880,.42],[2.30,1046,.42],[2.78,880,.50]
+    ];
+    tones.forEach(([offset,freq,duration])=>{
       const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
       osc.connect(gain);gain.connect(audioCtx.destination);
-      osc.type="sine";osc.frequency.value=i===2?1046:880;
+      osc.type="square";osc.frequency.value=freq;
       gain.gain.setValueAtTime(.0001,now+offset);
-      gain.gain.exponentialRampToValueAtTime(.20,now+offset+.015);
-      gain.gain.exponentialRampToValueAtTime(.0001,now+offset+.16);
-      osc.start(now+offset);osc.stop(now+offset+.18);
+      gain.gain.exponentialRampToValueAtTime(.42,now+offset+.02);
+      gain.gain.setValueAtTime(.42,now+offset+Math.max(.03,duration-.08));
+      gain.gain.exponentialRampToValueAtTime(.0001,now+offset+duration);
+      osc.start(now+offset);osc.stop(now+offset+duration+.02);
     });
   }catch{}
 }
@@ -361,22 +364,10 @@ function initToastSwipe(){
   toast.addEventListener("pointerup",e=>{if(startY!==null&&e.clientY-startY<-28)hideToast();startY=null});
   toast.addEventListener("pointercancel",()=>{startY=null});
 }
-async function showSystemNotification(title,options){
-  if(!alertEnabled())return;
-  try{
-    const opts={...options,requireInteraction:true,silent:false};
-    if("serviceWorker" in navigator){
-      const reg=await navigator.serviceWorker.ready;
-      if(reg&&reg.showNotification){await reg.showNotification(title,opts);return}
-    }
-    if("Notification" in window&&Notification.permission==="granted")new Notification(title,opts);
-  }catch{}
-}
 function sendPotAlert(g){
   if(!alertEnabled())return false;
   const text=tableLabel(g)+"の鍋温めから5分30秒経過しました";
   showToast(text);playAlertSound();
-  if("Notification" in window&&Notification.permission==="granted")showSystemNotification("鍋温めアラート",{body:text,tag:"pot-"+g.id,renotify:true});
   return true;
 }
 function checkPotAlerts(){
