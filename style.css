@@ -73,3 +73,5 @@ th:nth-child(13){width:8.0%} th:nth-child(14){width:5.4%} th:nth-child(15){width
 .alert-toast-hint{margin-top:5px;font-size:10px;font-weight:600;color:#cbd5e1}
 
 .test-tools{display:grid;gap:8px;margin-top:14px}.test-tools .btn{min-height:42px;text-align:left}
+
+.alert-stop{background:#fee2e2!important;color:#991b1b!important;border-color:#fecaca!important;font-weight:900}

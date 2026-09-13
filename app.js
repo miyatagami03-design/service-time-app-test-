@@ -19,6 +19,8 @@ let linkSelected=new Set();
 let moveSource=null;
 let moveTarget=null;
 let audioCtx=null;
+let alertLoopTimer=null;
+let alertActive=false;
 
 function blankGroup(n){
   return {
@@ -310,13 +312,23 @@ function syncAlertToggle(){
   b.classList.toggle("on",on);
   b.setAttribute("aria-checked",on?"true":"false");
 }
+function syncStopButton(){
+  const b=document.getElementById("stopAlertBtn");
+  if(b)b.hidden=!alertActive;
+}
+async function requestNotificationPermission(){
+  try{
+    if("Notification" in window&&Notification.permission==="default"){
+      await Notification.requestPermission();
+    }
+  }catch{}
+}
 async function toggleAlerts(){
   const next=!alertEnabled();
-  if(!next){setAlertEnabled(false);hideToast();return}
+  if(!next){setAlertEnabled(false);stopAlertSound();return}
   primeAudio();
+  await requestNotificationPermission();
   setAlertEnabled(true);
-  playAlertSound();
-  showToast("アラートをONにしました");
 }
 function playAlertSound(){
   if(!alertEnabled())return;
@@ -324,50 +336,46 @@ function playAlertSound(){
     primeAudio();
     if(!audioCtx)return;
     const now=audioCtx.currentTime;
-    // 店内で気づきやすい、長め・大きめの警告音（約3.4秒）
-    const tones=[
-      [0.00,880,.36],[0.42,1046,.36],[0.84,880,.36],[1.26,1046,.36],
-      [1.82,880,.42],[2.30,1046,.42],[2.78,880,.50]
-    ];
-    tones.forEach(([offset,freq,duration])=>{
+    [0,.22,.44].forEach((offset,i)=>{
       const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
       osc.connect(gain);gain.connect(audioCtx.destination);
-      osc.type="square";osc.frequency.value=freq;
+      osc.type="sine";osc.frequency.value=i===2?1046:880;
       gain.gain.setValueAtTime(.0001,now+offset);
-      gain.gain.exponentialRampToValueAtTime(.42,now+offset+.02);
-      gain.gain.setValueAtTime(.42,now+offset+Math.max(.03,duration-.08));
-      gain.gain.exponentialRampToValueAtTime(.0001,now+offset+duration);
-      osc.start(now+offset);osc.stop(now+offset+duration+.02);
+      gain.gain.exponentialRampToValueAtTime(.24,now+offset+.015);
+      gain.gain.exponentialRampToValueAtTime(.0001,now+offset+.16);
+      osc.start(now+offset);osc.stop(now+offset+.18);
     });
   }catch{}
 }
-function showToast(text){
+function startAlertSound(){
   if(!alertEnabled())return;
-  const toast=document.getElementById("alertToast");
-  const textEl=document.getElementById("alertToastText");
-  if(!toast||!textEl)return;
-  textEl.textContent=text;
-  toast.classList.add("show");
-  toast.setAttribute("aria-hidden","false");
+  stopAlertSound();
+  alertActive=true;syncStopButton();
+  playAlertSound();
+  alertLoopTimer=setInterval(playAlertSound,6500);
 }
-function hideToast(){
-  const toast=document.getElementById("alertToast");
-  if(!toast)return;
-  toast.classList.remove("show");
-  toast.setAttribute("aria-hidden","true");
+function stopAlertSound(){
+  if(alertLoopTimer!==null){clearInterval(alertLoopTimer);alertLoopTimer=null}
+  alertActive=false;syncStopButton();
 }
-function initToastSwipe(){
-  const toast=document.getElementById("alertToast");
-  if(!toast)return;
-  let startY=null;
-  toast.addEventListener("pointerdown",e=>{startY=e.clientY;try{toast.setPointerCapture(e.pointerId)}catch{}});
-  toast.addEventListener("pointerup",e=>{if(startY!==null&&e.clientY-startY<-28)hideToast();startY=null});
-  toast.addEventListener("pointercancel",()=>{startY=null});
+async function showSystemNotification(title,options){
+  if(!alertEnabled())return;
+  try{
+    const opts={...options,requireInteraction:true,silent:false};
+    if("serviceWorker" in navigator){
+      const reg=await navigator.serviceWorker.ready;
+      if(reg&&reg.showNotification){await reg.showNotification(title,opts);return}
+    }
+    if("Notification" in window&&Notification.permission==="granted")new Notification(title,opts);
+  }catch{}
 }
 function sendPotAlert(g){
   if(!alertEnabled())return false;
   const text=tableLabel(g)+"の鍋温めから5分30秒経過しました";
-  showToast(text);playAlertSound();
+  startAlertSound();
+  if("Notification" in window&&Notification.permission==="granted"){
+    showSystemNotification("鍋温めアラート",{body:text,tag:"pot-"+g.id,renotify:true});
+  }
   return true;
 }
 function checkPotAlerts(){
@@ -409,6 +417,7 @@ document.getElementById("versionBtn").onclick=()=>document.getElementById("versi
 document.getElementById("confirmLinkBtn").onclick=confirmLink;
 document.getElementById("confirmMoveBtn").onclick=confirmMove;
 document.getElementById("alertToggle").onclick=toggleAlerts;
+document.getElementById("stopAlertBtn").onclick=stopAlertSound;
 document.getElementById("testToolsBtn").onclick=openTestTools;
 document.getElementById("testNineBtn").onclick=testNineWarnings;
 document.getElementById("testArrivalBtn").onclick=testArrivalWarning;
@@ -449,7 +458,7 @@ if("serviceWorker" in navigator){
 })();
 
 syncAlertToggle();
-initToastSwipe();
+syncStopButton();
 checkPotAlerts();
 render();
 })();
