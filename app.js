@@ -294,11 +294,37 @@ function confirmMove(){
   state.groups.sort((a,b)=>a.representative_table-b.representative_table);
   save();document.getElementById("moveDialog").close();render();
 }
-function primeAudio(){
+function getAudioContext(){
   try{
-    audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
-    if(audioCtx.state==="suspended")audioCtx.resume();
+    const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+    if(!AudioContextClass)return null;
+    if(!audioCtx||audioCtx.state==="closed")audioCtx=new AudioContextClass();
+    return audioCtx;
+  }catch{return null}
+}
+function playSilentUnlock(ctx){
+  try{
+    const source=ctx.createBufferSource();
+    source.buffer=ctx.createBuffer(1,1,22050);
+    source.connect(ctx.destination);
+    source.start(0);
   }catch{}
+}
+async function ensureAudioReady(unlock=false){
+  const ctx=getAudioContext();
+  if(!ctx)return null;
+  try{
+    if(unlock)playSilentUnlock(ctx);
+    if(ctx.state==="suspended")await ctx.resume();
+    if(unlock&&ctx.state==="running")playSilentUnlock(ctx);
+  }catch{}
+  return ctx;
+}
+async function unlockAudio(){
+  const wasRunning=audioCtx?.state==="running";
+  const ctx=await ensureAudioReady(true);
+  if(!wasRunning&&ctx?.state==="running"&&alertActive)void playAlertSound();
+  return ctx?.state==="running";
 }
 function alertEnabled(){return localStorage.getItem(ALERT_KEY)==="1"}
 function setAlertEnabled(on){
@@ -326,19 +352,19 @@ async function requestNotificationPermission(){
 async function toggleAlerts(){
   const next=!alertEnabled();
   if(!next){setAlertEnabled(false);stopAlertSound();return}
-  primeAudio();
+  await unlockAudio();
   await requestNotificationPermission();
   setAlertEnabled(true);
 }
-function playAlertSound(){
+async function playAlertSound(){
   if(!alertEnabled())return;
   try{
-    primeAudio();
-    if(!audioCtx)return;
-    const now=audioCtx.currentTime;
+    const ctx=await ensureAudioReady();
+    if(!ctx||ctx.state!=="running")return;
+    const now=ctx.currentTime;
     [0,.22,.44].forEach((offset,i)=>{
-      const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
-      osc.connect(gain);gain.connect(audioCtx.destination);
+      const osc=ctx.createOscillator(),gain=ctx.createGain();
+      osc.connect(gain);gain.connect(ctx.destination);
       osc.type="sine";osc.frequency.value=i===2?1046:880;
       gain.gain.setValueAtTime(.0001,now+offset);
       gain.gain.exponentialRampToValueAtTime(.24,now+offset+.015);
@@ -351,8 +377,8 @@ function startAlertSound(){
   if(!alertEnabled())return;
   stopAlertSound();
   alertActive=true;syncStopButton();
-  playAlertSound();
-  alertLoopTimer=setInterval(playAlertSound,6500);
+  void playAlertSound();
+  alertLoopTimer=setInterval(()=>void playAlertSound(),6500);
 }
 function stopAlertSound(){
   if(alertLoopTimer!==null){clearInterval(alertLoopTimer);alertLoopTimer=null}
@@ -378,6 +404,10 @@ function sendPotAlert(g){
   }
   return true;
 }
+async function checkForegroundAudio(){
+  if(document.visibilityState==="hidden"||!alertEnabled())return;
+  await ensureAudioReady();
+}
 function checkPotAlerts(){
   let changed=false;
   for(const g of state.groups){
@@ -402,9 +432,10 @@ function testNineWarnings(){
 function testArrivalWarning(){
   state=freshState();state.groups[5].arrival_at=ago(106*60*1000);save();render();document.getElementById("testToolsDialog").close();
 }
-function testPotAlert(){
+async function testPotAlert(){
   if(!alertEnabled())setAlertEnabled(true);
-  primeAudio();
+  await unlockAudio();
+  await requestNotificationPermission();
   state=freshState();state.groups[2].pot_warm_at=ago(6*60*1000);state.groups[2].pot_warm_alerted_at=null;save();document.getElementById("testToolsDialog").close();checkPotAlerts();render();
 }
 function testReset(){state=freshState();save();render();document.getElementById("testToolsDialog").close()}
@@ -418,12 +449,16 @@ document.getElementById("confirmLinkBtn").onclick=confirmLink;
 document.getElementById("confirmMoveBtn").onclick=confirmMove;
 document.getElementById("alertToggle").onclick=toggleAlerts;
 document.getElementById("stopAlertBtn").onclick=stopAlertSound;
+document.getElementById("testAlertBtn").onclick=testPotAlert;
 document.getElementById("testToolsBtn").onclick=openTestTools;
 document.getElementById("testNineBtn").onclick=testNineWarnings;
 document.getElementById("testArrivalBtn").onclick=testArrivalWarning;
 document.getElementById("testPotBtn").onclick=testPotAlert;
 document.getElementById("testResetBtn").onclick=testReset;
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.close).close());
+document.addEventListener("pointerdown",()=>{if(alertEnabled())void unlockAudio()},{capture:true,passive:true});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")void checkForegroundAudio()});
+window.addEventListener("pageshow",()=>void checkForegroundAudio());
 
 setInterval(()=>{
   const today=JST_DATE();

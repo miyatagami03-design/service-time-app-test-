@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="接客時間管理">
-<link rel="manifest" href="./manifest.webmanifest?v=214t">
+<link rel="manifest" href="./manifest.webmanifest?v=215t">
 <link rel="apple-touch-icon" href="../icon-180.png">
-<link rel="stylesheet" href="./style.css?v=214t">
+<link rel="stylesheet" href="./style.css?v=215t">
 <title>接客時間管理</title>
 </head>
 <body>
@@ -24,12 +24,13 @@
         <button id="historyBtn" class="btn" type="button">本日の履歴</button>
         <button id="moveBtn" class="btn" type="button">席移動</button>
         <button id="linkBtn" class="btn" type="button">卓を連結</button>
-        <label class="alert-setting" for="alertToggle"><span>アラート</span><button id="alertToggle" class="switch" type="button" role="switch" aria-checked="false" aria-label="アラート"><span class="switch-knob"></span></button></label>
-        <button id="stopAlertBtn" class="btn alert-stop" type="button" hidden>アラート停止</button>
-        <button id="testToolsBtn" class="btn" type="button">テスト補助</button>
+      <label class="alert-setting" for="alertToggle"><span>アラート</span><button id="alertToggle" class="switch" type="button" role="switch" aria-checked="false" aria-label="アラート"><span class="switch-knob"></span></button></label>
+      <button id="stopAlertBtn" class="btn alert-stop" type="button" hidden>アラート停止</button>
+      <button id="testAlertBtn" class="btn" type="button">アラームテスト</button>
+      <button id="testToolsBtn" class="btn" type="button">テスト補助</button>
         <button id="resetBtn" class="btn" type="button">今日をリセット</button>
       </div>
-      <button id="versionBtn" class="version" type="button">Ver.2.1.4 TEST</button>
+    <button id="versionBtn" class="version" type="button">Ver.2.1.5 TEST</button>
     </div>
   </div>
 
@@ -71,6 +72,10 @@
 <dialog id="versionDialog">
   <div class="dialog-body">
     <h3>更新履歴</h3>
+    <div class="history-card">
+      <div class="history-title">Ver.2.1.5 TEST</div>
+      <div class="history-sub">iPhone／iPadのアラーム音安定化と実機確認用アラームテストを追加</div>
+    </div>
     <div class="history-card">
       <div class="history-title">Ver.2.1.4 TEST</div>
       <div class="history-sub">端末通知を表示／短いアラート音を定期的に繰り返し／アプリ内通知を廃止</div>
@@ -158,6 +163,6 @@
   </div>
 </dialog>
 
-<script src="./app.js?v=214t"></script>
+<script src="./app.js?v=215t"></script>
 </body>
 </html>
