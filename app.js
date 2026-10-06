@@ -19,6 +19,8 @@ let linkSelected=new Set();
 let moveSource=null;
 let moveTarget=null;
 let audioCtx=null;
+let alertAudio=null;
+let alertAudioUrl=null;
 let alertLoopTimer=null;
 let alertActive=false;
 
@@ -302,6 +304,66 @@ function getAudioContext(){
     return audioCtx;
   }catch{return null}
 }
+function createAlertWaveUrl(){
+  try{
+    if(alertAudioUrl)return alertAudioUrl;
+    const sampleRate=12000,duration=.62,sampleCount=Math.ceil(sampleRate*duration);
+    const buffer=new ArrayBuffer(44+sampleCount*2),view=new DataView(buffer);
+    const write=(offset,text)=>{for(let i=0;i<text.length;i++)view.setUint8(offset+i,text.charCodeAt(i))};
+    write(0,"RIFF");view.setUint32(4,36+sampleCount*2,true);write(8,"WAVE");write(12,"fmt ");
+    view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
+    view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);
+    write(36,"data");view.setUint32(40,sampleCount*2,true);
+    const tones=[[0,.16,880],[.22,.38,880],[.44,.60,1046]];
+    for(let i=0;i<sampleCount;i++){
+      const t=i/sampleRate;
+      let sample=0;
+      for(const [start,end,frequency] of tones){
+        if(t>=start&&t<end){
+          const local=t-start,envelope=Math.min(1,local/.012,(end-t)/.025);
+          sample=Math.sin(2*Math.PI*frequency*local)*.34*Math.max(0,envelope);
+          break;
+        }
+      }
+      view.setInt16(44+i*2,Math.round(sample*32767),true);
+    }
+    alertAudioUrl=URL.createObjectURL(new Blob([buffer],{type:"audio/wav"}));
+    return alertAudioUrl;
+  }catch{return null}
+}
+function getAlertAudio(){
+  try{
+    if(alertAudio)return alertAudio;
+    const url=createAlertWaveUrl();
+    if(!url||typeof Audio==="undefined")return null;
+    alertAudio=new Audio(url);
+    alertAudio.preload="auto";
+    alertAudio.playsInline=true;
+    return alertAudio;
+  }catch{return null}
+}
+async function unlockMediaAudio(){
+  const audio=getAlertAudio();
+  if(!audio)return false;
+  try{
+    audio.muted=true;audio.currentTime=0;
+    await audio.play();
+    audio.pause();audio.currentTime=0;audio.muted=false;
+    return true;
+  }catch{
+    try{audio.muted=false}catch{}
+    return false;
+  }
+}
+async function playMediaAlertSound(){
+  const audio=getAlertAudio();
+  if(!audio)return false;
+  try{
+    audio.muted=false;audio.currentTime=0;
+    await audio.play();
+    return true;
+  }catch{return false}
+}
 function playSilentUnlock(ctx){
   try{
     const source=ctx.createBufferSource();
@@ -322,9 +384,11 @@ async function ensureAudioReady(unlock=false){
 }
 async function unlockAudio(){
   const wasRunning=audioCtx?.state==="running";
-  const ctx=await ensureAudioReady(true);
+  const mediaPromise=unlockMediaAudio();
+  const contextPromise=ensureAudioReady(true);
+  const [mediaReady,ctx]=await Promise.all([mediaPromise,contextPromise]);
   if(!wasRunning&&ctx?.state==="running"&&alertActive)void playAlertSound();
-  return ctx?.state==="running";
+  return mediaReady||ctx?.state==="running";
 }
 function alertEnabled(){return localStorage.getItem(ALERT_KEY)==="1"}
 function setAlertEnabled(on){
@@ -358,6 +422,7 @@ async function toggleAlerts(){
 }
 async function playAlertSound(){
   if(!alertEnabled())return;
+  if(await playMediaAlertSound())return;
   try{
     const ctx=await ensureAudioReady();
     if(!ctx||ctx.state!=="running")return;
@@ -382,6 +447,7 @@ function startAlertSound(){
 }
 function stopAlertSound(){
   if(alertLoopTimer!==null){clearInterval(alertLoopTimer);alertLoopTimer=null}
+  if(alertAudio){try{alertAudio.pause();alertAudio.currentTime=0}catch{}}
   alertActive=false;syncStopButton();
 }
 async function showSystemNotification(title,options){
