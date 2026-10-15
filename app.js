@@ -6,7 +6,20 @@ const STEP_DEFS=[
   ["鍋作り終わり","pot_finish_at"],["山椒","sansho_at"],["あく取り・スープ","soup_at"],
   ["〆の発注","closing_order_at"],["〆作り終わり","closing_finish_at"],["あがりおしぼり","oshibori_at"],["会計","checkout_at"]
 ];
-const COL_TO_LABEL=Object.fromEntries(STEP_DEFS.map(([l,c])=>[c,l]));
+// コース別の追加項目（after＝この項目の後に提供）
+const COURSES={
+  normal:{label:"通常",note:"追加項目なし"},
+  kamo:{label:"鴨づくし",note:"前菜の後にアミューズ"},
+  kiwami:{label:"極み",note:"アミューズ＋鍋作り終わりの後にワンタン・副材料"}
+};
+const EXTRA_STEPS=[
+  {label:"アミューズ",col:"amuse_at",after:"starter_at",courses:["kamo","kiwami"]},
+  {label:"ワンタン",col:"wonton_at",after:"pot_finish_at",courses:["kiwami"]},
+  {label:"副材料",col:"side_at",after:"pot_finish_at",courses:["kiwami"]}
+];
+const ALL_STEPS=[...STEP_DEFS,...EXTRA_STEPS.map(e=>[e.label,e.col])];
+const COL_TO_LABEL=Object.fromEntries(ALL_STEPS.map(([l,c])=>[c,l]));
+const NINE_MIN_STEPS=new Set(["amuse_at","pot_warm_at","wonton_at","side_at","sansho_at","soup_at","closing_order_at","oshibori_at"]);
 const STORAGE_KEY="service-time-local-v21-test";
 const ALERT_KEY="service-time-alerts-v21-test";
 const timeFmt=new Intl.DateTimeFormat("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit",hour12:false});
@@ -27,8 +40,9 @@ let alertActive=false;
 function blankGroup(n){
   return {
     id:crypto.randomUUID?crypto.randomUUID():String(Date.now())+"-"+n+"-"+Math.random(),
-    representative_table:n,linked_tables:[n],reservation_time:null,
-    arrival_at:null,explanation_at:null,starter_at:null,pot_warm_at:null,pot_finish_at:null,
+    representative_table:n,linked_tables:[n],reservation_time:null,course:"normal",
+    arrival_at:null,explanation_at:null,starter_at:null,amuse_at:null,pot_warm_at:null,pot_finish_at:null,
+    wonton_at:null,side_at:null,
     sansho_at:null,soup_at:null,closing_order_at:null,closing_finish_at:null,oshibori_at:null,checkout_at:null,
     pot_warm_alerted_at:null
   };
@@ -53,7 +67,14 @@ function elapsedFrom(v){
   return String(Math.floor(sec/3600)).padStart(2,"0")+":"+String(Math.floor(sec%3600/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0");
 }
 function groupForTable(n){return state.groups.find(g=>(g.linked_tables||[]).includes(n))}
-function hasService(g){return STEP_DEFS.some(([,c])=>!!g[c])}
+function hasService(g){return ALL_STEPS.some(([,c])=>!!g[c])}
+function courseOf(g){return COURSES[g?.course]?g.course:"normal"}
+function extraStepsFor(g){return EXTRA_STEPS.filter(e=>e.courses.includes(courseOf(g)))}
+function courseSequence(g){
+  const extras=extraStepsFor(g),seq=[];
+  for(const [,c] of STEP_DEFS){seq.push(c);for(const e of extras)if(e.after===c)seq.push(e.col)}
+  return seq;
+}
 function isLate(g){
   if(!g?.reservation_time||g.arrival_at||g.checkout_at)return false;
   const [h,m]=String(g.reservation_time).slice(0,5).split(":").map(Number);
@@ -66,15 +87,9 @@ function elapsedWarn(g,startCol,endCol,ms){return !!(g?.[startCol]&&!g?.[endCol]
 function potWarn(g){return elapsedWarn(g,"pot_warm_at","pot_finish_at",330000)}
 function arrivalWarn(g){return !!(g?.arrival_at&&!g.checkout_at&&(Date.now()-new Date(g.arrival_at).getTime()>=6300000))}
 function nineMinWarn(g,col){
-  const rules={
-    pot_warm_at:["starter_at","pot_warm_at"],
-    sansho_at:["pot_finish_at","sansho_at"],
-    soup_at:["sansho_at","soup_at"],
-    closing_order_at:["soup_at","closing_order_at"],
-    oshibori_at:["closing_finish_at","oshibori_at"]
-  };
-  const r=rules[col];
-  return r?elapsedWarn(g,r[0],r[1],540000):false;
+  if(!g||!NINE_MIN_STEPS.has(col))return false;
+  const seq=courseSequence(g),i=seq.indexOf(col);
+  return i>0?elapsedWarn(g,seq[i-1],col,540000):false;
 }
 function labelHtml(step){
   return step.replace("鍋作り終わり","鍋作り<br>終わり")
@@ -95,6 +110,33 @@ function recordStep(g,col){
     if(col==="pot_warm_at")g.pot_warm_alerted_at=null;
   }
   save();render();
+}
+let courseTarget=null;
+function openCourse(g){
+  if(!g)return;
+  courseTarget=g;
+  document.getElementById("courseTitle").textContent=tableLabel(g)+"のコース";
+  const box=document.getElementById("courseChoices");box.innerHTML="";
+  for(const [key,c] of Object.entries(COURSES)){
+    const b=document.createElement("button");b.type="button";
+    b.className="choice course-choice"+(courseOf(g)===key?" selected":"");
+    b.innerHTML="<div>"+c.label+"</div><div class='choice-sub'>"+c.note+"</div>";
+    b.onclick=()=>setCourse(key);box.appendChild(b);
+  }
+  document.getElementById("courseDialog").showModal();
+}
+function setCourse(key){
+  const g=courseTarget;
+  if(!g)return;
+  if(courseOf(g)!==key){
+    const lost=EXTRA_STEPS.filter(e=>!e.courses.includes(key)&&g[e.col]);
+    if(lost.length&&!confirm(COURSES[key].label+"コースに変更しますか？\n「"+lost.map(e=>e.label).join("・")+"」の記録は取り消されます。"))return;
+    for(const e of EXTRA_STEPS)if(!e.courses.includes(key))g[e.col]=null;
+    g.course=key;
+    save();render();
+  }
+  document.getElementById("courseDialog").close();
+  courseTarget=null;
 }
 let reservationTarget=null;
 function openReservation(g){
@@ -158,10 +200,17 @@ function render(){
       tr.appendChild(td);body.appendChild(tr);continue;
     }
 
+    const extras=extraStepsFor(g);
+    if(extras.length){seat.rowSpan=2;tr.classList.add("has-extra")}
+
     const tdRes=document.createElement("td");
     const rb=document.createElement("button");rb.type="button";rb.className="timeinput-btn"+(g?.reservation_time?"":" empty");
     rb.textContent=g?.reservation_time?String(g.reservation_time).slice(0,5):"";
-    rb.onclick=()=>openReservation(g);tdRes.appendChild(rb);tr.appendChild(tdRes);
+    rb.onclick=()=>openReservation(g);tdRes.appendChild(rb);
+    const cb=document.createElement("button");cb.type="button";cb.className="course-btn "+courseOf(g);
+    cb.textContent=COURSES[courseOf(g)].label;
+    cb.onclick=()=>openCourse(g);tdRes.appendChild(cb);
+    tr.appendChild(tdRes);
 
     const tdEl=document.createElement("td");
     const sp=document.createElement("span");sp.className="elapsed"+(arrivalWarn(g)?" danger":"");sp.textContent=elapsedFrom(g?.arrival_at);
@@ -172,17 +221,44 @@ function render(){
       if(label==="来店"&&isLate(g))td.classList.add("late");
       if(label==="鍋作り終わり")td.classList.add("milestone30");
       if(label==="〆の発注")td.classList.add("milestone60");
-      const b=document.createElement("button");b.type="button";
-      b.className="step"+(g?.[col]?" done":"")+((col==="pot_finish_at"&&potWarn(g))||nineMinWarn(g,col)?" warn":"");
-      b.innerHTML="<span>"+labelHtml(label)+"</span>"+(g?.[col]?"<span class='t'>"+fmtTime(g[col])+"</span>":"");
-      b.onclick=()=>recordStep(g,col);td.appendChild(b);tr.appendChild(td);
+      td.appendChild(stepButton(g,label,col));tr.appendChild(td);
     }
 
     const tdN=document.createElement("td");
     const nb=document.createElement("button");nb.type="button";nb.className="next";nb.textContent="次の組";nb.onclick=()=>nextGroup(g);
     tdN.appendChild(nb);tr.appendChild(tdN);
     body.appendChild(tr);
+    if(extras.length)body.appendChild(extraRow(g,extras));
   }
+}
+function stepButton(g,label,col){
+  const b=document.createElement("button");b.type="button";
+  b.className="step"+(g?.[col]?" done":"")+((col==="pot_finish_at"&&potWarn(g))||nineMinWarn(g,col)?" warn":"");
+  b.innerHTML="<span>"+labelHtml(label)+"</span>"+(g?.[col]?"<span class='t'>"+fmtTime(g[col])+"</span>":"");
+  b.onclick=()=>recordStep(g,col);
+  return b;
+}
+// 追加項目の行：各項目は「直後に提供する項目」の列の下に並べる（同じ列が埋まっていれば右へ）
+function extraRow(g,extras){
+  const tr=document.createElement("tr");tr.className="extra-row";
+  const head=document.createElement("td");head.colSpan=4;head.className="extra-head";
+  head.innerHTML="<span class='course-tag "+courseOf(g)+"'>"+COURSES[courseOf(g)].label+"</span>追加項目";
+  tr.appendChild(head);
+  const slots=new Array(STEP_DEFS.length+1).fill(null);
+  for(const e of extras){
+    let i=STEP_DEFS.findIndex(([,c])=>c===e.after);
+    while(slots[i])i++;
+    slots[i]=e;
+  }
+  for(let i=2;i<slots.length;i++){
+    const td=document.createElement("td");
+    const col=STEP_DEFS[i]?.[1];
+    if(col==="pot_finish_at")td.classList.add("milestone30");
+    if(col==="closing_order_at")td.classList.add("milestone60");
+    if(slots[i])td.appendChild(stepButton(g,slots[i].label,slots[i].col));
+    tr.appendChild(td);
+  }
+  return tr;
 }
 
 function renderHistory(){
@@ -192,9 +268,9 @@ function renderHistory(){
     const card=document.createElement("div");card.className="history-card";
     const res=h.reservation_time?String(h.reservation_time).slice(0,5):"—";
     const arr=fmtTime(h.arrival_at)||"—",co=fmtTime(h.checkout_at)||"—";
-    card.innerHTML="<button type='button'><div class='history-title'>"+tableLabel(h)+"　予約 "+res+"</div><div class='history-sub'>来店 "+arr+"　→　会計 "+co+"</div><div class='history-detail' style='display:none'></div></button>";
+    card.innerHTML="<button type='button'><div class='history-title'>"+tableLabel(h)+"　"+COURSES[courseOf(h)].label+"　予約 "+res+"</div><div class='history-sub'>来店 "+arr+"　→　会計 "+co+"</div><div class='history-detail' style='display:none'></div></button>";
     const detail=card.querySelector(".history-detail");
-    detail.innerHTML=STEP_DEFS.map(([l,c])=>h[c]?l+" "+fmtTime(h[c]):"").filter(Boolean).join(" ｜ ")||"記録なし";
+    detail.innerHTML=courseSequence(h).map(c=>h[c]?COL_TO_LABEL[c]+" "+fmtTime(h[c]):"").filter(Boolean).join(" ｜ ")||"記録なし";
     card.querySelector("button").onclick=()=>detail.style.display=detail.style.display==="none"?"block":"none";
     box.appendChild(card);
   }
@@ -267,14 +343,14 @@ function renderMoveChoices(){
     b.onclick=()=>{
       if(moveSource===null){
         if(!g||g.representative_table!==n||g.linked_tables.length>1)return alert("連結中の卓は席移動できません。先に連結を解除してください。");
-        if(!g.reservation_time&&!hasService(g))return alert("この卓には移動する記録がありません。");
+        if(!g.reservation_time&&!hasService(g)&&courseOf(g)==="normal")return alert("この卓には移動する記録がありません。");
         moveSource=n;
       }else if(n===moveSource){
         moveSource=null;moveTarget=null;
       }else{
         const target=groupForTable(n);
         if(!target||target.representative_table!==n||target.linked_tables.length>1)return alert("連結中の卓には移動できません。");
-        if(target.reservation_time||hasService(target))return alert("移動先の卓にはすでに記録があります。");
+        if(target.reservation_time||hasService(target)||courseOf(target)!=="normal")return alert("移動先の卓にはすでに記録があります。");
         moveTarget=n;
       }
       renderMoveChoices();
@@ -282,7 +358,7 @@ function renderMoveChoices(){
     box.appendChild(b);
   }
   document.getElementById("moveInstructions").textContent=moveSource===null?"移動元の卓を選んでください。":moveTarget===null?moveSource+"卓 → 移動先の卓を選んでください。":moveSource+"卓 → "+moveTarget+"卓へ移動";
-  document.getElementById("moveWarning").textContent="予約時間・来店以降の記録をまとめて移動します。";
+  document.getElementById("moveWarning").textContent="予約時間・コース・来店以降の記録をまとめて移動します。";
 }
 function confirmMove(){
   if(moveSource===null||moveTarget===null)return alert("移動元と移動先を選んでください。");
