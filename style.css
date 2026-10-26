@@ -85,3 +85,14 @@ th:nth-child(13){width:8.0%} th:nth-child(14){width:5.4%} th:nth-child(15){width
 .course-tag{display:inline-block;margin-right:6px;padding:2px 8px;border:1px solid var(--line);border-radius:999px}
 .course-choice{padding:14px 8px;font-size:16px}
 .choice-sub{font-size:11px;font-weight:600;color:var(--muted);margin-top:4px;line-height:1.4}
+.course-btn.tanpin,.course-tag.tanpin{background:#e5e7eb;border-color:#9ca3af;color:#374151}
+.course-btn.tanpin_kamo,.course-tag.tanpin_kamo{background:#dfe7e6;border-color:#6b8f8a;color:#234e48}
+tr.tanpin td{background:#eceef1}
+tr.tanpin .step:not(.done):not(.warn){background:#f4f5f7;color:#4b5563}
+td.na{color:#b8bdc6;background:#e9ebef!important;font-weight:800}
+.lo-box{font-size:11px;font-weight:900;line-height:1.1;padding:4px 1px;border:1px dashed var(--line);border-radius:7px;color:var(--muted)}
+.lo-box .t{display:block;margin-top:2px;font-size:12px;color:var(--text);font-variant-numeric:tabular-nums}
+.lo-box.danger{background:var(--danger);border:2px solid var(--danger-line);color:#991b1b}
+.drink-toggle{display:block;width:100%;margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:15px;font-weight:800}
+.drink-toggle.on{background:#e7f6ec;border-color:#34a853;color:#14532d}
+.drink-toggle:disabled{opacity:.85;cursor:default}
