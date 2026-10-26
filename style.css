@@ -96,3 +96,4 @@ td.na{color:#b8bdc6;background:#e9ebef!important;font-weight:800}
 .drink-toggle{display:block;width:100%;margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:15px;font-weight:800}
 .drink-toggle.on{background:#e7f6ec;border-color:#34a853;color:#14532d}
 .drink-toggle:disabled{opacity:.85;cursor:default}
+.step.skipped{background:transparent;border-style:dashed;color:#b8bdc6}
