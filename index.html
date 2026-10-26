@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="接客時間管理">
-<link rel="manifest" href="./manifest.webmanifest?v=220t">
+<link rel="manifest" href="./manifest.webmanifest?v=230t">
 <link rel="apple-touch-icon" href="../icon-180.png">
-<link rel="stylesheet" href="./style.css?v=220t">
+<link rel="stylesheet" href="./style.css?v=230t">
 <title>接客時間管理</title>
 </head>
 <body>
@@ -30,7 +30,7 @@
       <button id="testToolsBtn" class="btn" type="button">テスト補助</button>
         <button id="resetBtn" class="btn" type="button">今日をリセット</button>
       </div>
-    <button id="versionBtn" class="version" type="button">Ver.2.2.0 TEST</button>
+    <button id="versionBtn" class="version" type="button">Ver.2.3.0 TEST</button>
     </div>
   </div>
 
@@ -72,6 +72,10 @@
 <dialog id="versionDialog">
   <div class="dialog-body">
     <h3>更新履歴</h3>
+    <div class="history-card">
+      <div class="history-title">Ver.2.3.0 TEST</div>
+      <div class="history-sub">飲み放題（開始から1時間30分でラストオーダー・アラート）／極みに飲み放題・食後デザートを追加／単品・単品鴨しゃぶを追加</div>
+    </div>
     <div class="history-card">
       <div class="history-title">Ver.2.2.0 TEST</div>
       <div class="history-sub">卓ごとにコース（通常／鴨づくし／極み）を選択可能に／鴨づくし・極みは追加項目（アミューズ・ワンタン・副材料）を下の行に表示</div>
@@ -137,6 +141,7 @@
       <button id="testNineBtn" class="btn" type="button">9分警告を一括表示</button>
       <button id="testArrivalBtn" class="btn" type="button">1時間45分警告を表示</button>
       <button id="testPotBtn" class="btn" type="button">鍋5分30秒アラートを発火</button>
+      <button id="testDrinkBtn" class="btn" type="button">飲み放題L.O.アラートを発火</button>
       <button id="testResetBtn" class="btn" type="button">TESTデータを初期化</button>
     </div>
     <div class="dialog-actions"><button class="btn" data-close="testToolsDialog">閉じる</button></div>
@@ -160,7 +165,11 @@
   <div class="dialog-body">
     <h3 id="courseTitle">コース</h3>
     <div id="courseChoices" class="choice-grid"></div>
-    <div class="dialog-actions"><button class="btn" data-close="courseDialog" type="button">キャンセル</button></div>
+    <button id="drinkToggle" class="drink-toggle" type="button"></button>
+    <div class="dialog-actions">
+      <button class="btn" data-close="courseDialog" type="button">キャンセル</button>
+      <button id="courseSaveBtn" class="btn primary" type="button">決定</button>
+    </div>
   </div>
 </dialog>
 
@@ -179,6 +188,6 @@
   </div>
 </dialog>
 
-<script src="./app.js?v=220t"></script>
+<script src="./app.js?v=230t"></script>
 </body>
 </html>
