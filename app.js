@@ -12,7 +12,7 @@ const COURSES={
   kamo:{label:"鴨づくし",note:"前菜の後にアミューズ"},
   kiwami:{label:"極み",note:"飲み放題込み／アミューズ・ワンタン・副材料・食後デザート",drink:true},
   tanpin:{label:"単品",note:"コースなし",tanpin:true},
-  tanpin_kamo:{label:"単品鴨しゃぶ",note:"前菜・〆なし",tanpin:true,skip:["starter_at","closing_order_at","closing_finish_at"]}
+  tanpin_kamo:{label:"単品鴨しゃぶ",note:"前菜・〆なし",skip:["starter_at","closing_order_at","closing_finish_at"]}
 };
 // 追加項目（after＝この項目の後に提供。下の行ではこの項目の列の下に並ぶ）
 const EXTRA_STEPS=[
