@@ -12,7 +12,7 @@ const COURSES={
   kamo:{label:"鴨づくし",note:"前菜の後にアミューズ"},
   kiwami:{label:"極み",note:"飲み放題込み／アミューズ・ワンタン・副材料・食後デザート",drink:true},
   tanpin:{label:"単品",note:"コースなし",tanpin:true},
-  tanpin_kamo:{label:"単品鴨しゃぶ",note:"前菜・〆なし",skip:["starter_at","closing_order_at","closing_finish_at"]}
+  tanpin_kamo:{label:"単品鴨しゃぶ",note:"前菜・〆なし（追加注文はグレーの項目をタップ）",skip:["starter_at","closing_order_at","closing_finish_at"],unlock:{closing_finish_at:"closing_order_at"}}
 };
 // 追加項目（after＝この項目の後に提供。下の行ではこの項目の列の下に並ぶ）
 const EXTRA_STEPS=[
@@ -78,7 +78,13 @@ function courseOf(g){return COURSES[g?.course]?g.course:"normal"}
 function drinkOn(g){return !!(COURSES[courseOf(g)].drink||g?.drink)}
 function courseLabel(g,short){return COURSES[courseOf(g)].label+(g?.drink&&!COURSES[courseOf(g)].drink?(short?" +飲":"＋飲み放題"):"")}
 function hasCourseSetting(g){return courseOf(g)!=="normal"||!!g?.drink}
-function stepAvailable(g,col){return !(COURSES[courseOf(g)].skip||[]).includes(col)}
+// skipの項目も、記録済み（追加注文）なら通常どおり扱う。unlock＝この項目が記録されたら使えるようにする
+function stepAvailable(g,col){
+  const c=COURSES[courseOf(g)];
+  if(!(c.skip||[]).includes(col)||g?.[col])return true;
+  const key=c.unlock?.[col];
+  return !!(key&&g?.[key]);
+}
 function extraStepsFor(g){return EXTRA_STEPS.filter(e=>e.drink?drinkOn(g):e.courses.includes(courseOf(g)))}
 function courseSequence(g){
   const extras=extraStepsFor(g),seq=[];
@@ -251,7 +257,7 @@ function render(){
       if(label==="来店"&&isLate(g))td.classList.add("late");
       if(label==="鍋作り終わり")td.classList.add("milestone30");
       if(label==="〆の発注")td.classList.add("milestone60");
-      if(!stepAvailable(g,col)){td.classList.add("na");td.textContent="—";tr.appendChild(td);continue}
+      if(!stepAvailable(g,col)){td.classList.add("na");td.appendChild(skippedButton(g,label,col));tr.appendChild(td);continue}
       td.appendChild(stepButton(g,label,col));tr.appendChild(td);
     }
 
@@ -261,6 +267,16 @@ function render(){
     body.appendChild(tr);
     if(extras.length)body.appendChild(extraRow(g,extras));
   }
+}
+// コースに無い項目（グレー）。追加注文のときだけタップで記録できる
+function skippedButton(g,label,col){
+  const b=document.createElement("button");b.type="button";b.className="step skipped";
+  b.innerHTML="<span>"+labelHtml(label)+"</span>";
+  b.onclick=()=>{
+    if(!confirm("「"+label+"」は"+COURSES[courseOf(g)].label+"には含まれません。\n追加注文として記録しますか？"))return;
+    recordStep(g,col);
+  };
+  return b;
 }
 function stepButton(g,label,col){
   const b=document.createElement("button");b.type="button";
