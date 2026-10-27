@@ -11,7 +11,7 @@ const COURSES={
   normal:{label:"通常",note:"追加項目なし"},
   kamo:{label:"鴨づくし",note:"前菜の後にアミューズ"},
   kiwami:{label:"極み",note:"飲み放題込み／アミューズ・ワンタン・副材料・食後デザート",drink:true},
-  tanpin:{label:"単品",note:"コースなし",tanpin:true},
+  tanpin:{label:"単品",note:"コースなし（来店・説明・会計のみ）",skip:["starter_at","pot_warm_at","pot_finish_at","sansho_at","soup_at","closing_order_at","closing_finish_at","oshibori_at"],unlock:{pot_finish_at:"pot_warm_at",closing_finish_at:"closing_order_at"}},
   tanpin_kamo:{label:"単品鴨しゃぶ",note:"前菜・〆なし（追加注文はグレーの項目をタップ）",skip:["starter_at","closing_order_at","closing_finish_at"],unlock:{closing_finish_at:"closing_order_at"}}
 };
 // 追加項目（after＝この項目の後に提供。下の行ではこの項目の列の下に並ぶ）
