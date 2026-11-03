@@ -97,3 +97,14 @@ td.na{color:#b8bdc6;background:#e9ebef!important;font-weight:800}
 .drink-toggle.on{background:#e7f6ec;border-color:#34a853;color:#14532d}
 .drink-toggle:disabled{opacity:.85;cursor:default}
 .step.skipped{background:transparent;border-style:dashed;color:#b8bdc6}
+.point-label{margin-top:14px;font-size:12px;font-weight:800;color:var(--muted)}
+.point-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px}
+.point-choice{padding:10px 4px;font-size:14px}
+.step .pt{display:block;margin-top:2px;font-size:10px;color:#c2410c}
+.step.point{border-color:#fdba74}
+.step.point-due{background:#ffedd5;border:2px solid #f97316;animation:pointPulse 1.2s ease-in-out infinite}
+.point-banner{position:sticky;top:0;z-index:20;display:grid;gap:6px;margin:0 0 6px;padding:8px;border:3px solid #f97316;border-radius:12px;background:#fff7ed;animation:pointPulse 1.2s ease-in-out infinite}
+.point-banner[hidden]{display:none}
+.point-item{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:18px;font-weight:900;color:#9a3412}
+.point-item .btn{min-height:40px;font-size:14px;border-color:#f97316;flex:0 0 auto}
+@keyframes pointPulse{0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,.0)}50%{box-shadow:0 0 0 6px rgba(249,115,22,.35)}}

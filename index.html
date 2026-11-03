@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="接客時間管理">
-<link rel="manifest" href="./manifest.webmanifest?v=233t">
+<link rel="manifest" href="./manifest.webmanifest?v=240t">
 <link rel="apple-touch-icon" href="../icon-180.png">
-<link rel="stylesheet" href="./style.css?v=233t">
+<link rel="stylesheet" href="./style.css?v=240t">
 <title>接客時間管理</title>
 </head>
 <body>
@@ -30,11 +30,12 @@
       <button id="testToolsBtn" class="btn" type="button">テスト補助</button>
         <button id="resetBtn" class="btn" type="button">今日をリセット</button>
       </div>
-    <button id="versionBtn" class="version" type="button">Ver.2.3.3 TEST</button>
+    <button id="versionBtn" class="version" type="button">Ver.2.4.0 TEST</button>
     </div>
   </div>
 
   <p class="hint">各項目をタップすると現在時刻を記録。記録済み項目をもう一度タップすると確認後に取り消します。</p>
+  <div id="pointBanner" class="point-banner" hidden></div>
 
   <div class="board">
     <table>
@@ -72,6 +73,10 @@
 <dialog id="versionDialog">
   <div class="dialog-body">
     <h3>更新履歴</h3>
+    <div class="history-card">
+      <div class="history-title">Ver.2.4.0 TEST</div>
+      <div class="history-sub">ポイント（一休／ぐるなび／食べログV）の引き忘れ防止：来店から1時間15分で画面上部に表示、会計ボタンにもポイント名を表示</div>
+    </div>
     <div class="history-card">
       <div class="history-title">Ver.2.3.3 TEST</div>
       <div class="history-sub">単品は来店・説明・会計以外をグレー表示（グレーの項目はタップで追加注文として記録可能）</div>
@@ -154,6 +159,7 @@
       <button id="testArrivalBtn" class="btn" type="button">1時間45分警告を表示</button>
       <button id="testPotBtn" class="btn" type="button">鍋5分30秒アラートを発火</button>
       <button id="testDrinkBtn" class="btn" type="button">飲み放題L.O.アラートを発火</button>
+      <button id="testPointBtn" class="btn" type="button">ポイント引き忘れ表示を確認</button>
       <button id="testResetBtn" class="btn" type="button">TESTデータを初期化</button>
     </div>
     <div class="dialog-actions"><button class="btn" data-close="testToolsDialog">閉じる</button></div>
@@ -178,6 +184,8 @@
     <h3 id="courseTitle">コース</h3>
     <div id="courseChoices" class="choice-grid"></div>
     <button id="drinkToggle" class="drink-toggle" type="button"></button>
+    <div class="point-label">ポイント利用（会計時）</div>
+    <div id="pointChoices" class="point-grid"></div>
     <div class="dialog-actions">
       <button class="btn" data-close="courseDialog" type="button">キャンセル</button>
       <button id="courseSaveBtn" class="btn primary" type="button">決定</button>
@@ -200,6 +208,6 @@
   </div>
 </dialog>
 
-<script src="./app.js?v=233t"></script>
+<script src="./app.js?v=240t"></script>
 </body>
 </html>
