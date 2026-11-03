@@ -23,7 +23,7 @@ const EXTRA_STEPS=[
   {label:"食後デザート",col:"dessert_at",after:"oshibori_at",courses:["kiwami"]}
 ];
 const DRINK_LO_MS=90*60*1000;
-// 会計時に使うポイント。来店から1時間30分で引き忘れ防止の通知を出す
+// 会計時に使うポイント。来店から1時間30分で会計ボタンを強調する
 const POINTS={ikkyu:"一休ポイント",gnavi:"ぐるなびポイント",tabelog:"食べログVポイント"};
 const POINT_SHORT={ikkyu:"一休",gnavi:"ぐるなび",tabelog:"食べログV"};
 const POINT_ALERT_MS=90*60*1000;
@@ -52,7 +52,7 @@ function blankGroup(n){
     id:crypto.randomUUID?crypto.randomUUID():String(Date.now())+"-"+n+"-"+Math.random(),
     representative_table:n,linked_tables:[n],reservation_time:null,course:"normal",
     arrival_at:null,explanation_at:null,starter_at:null,amuse_at:null,pot_warm_at:null,pot_finish_at:null,
-    wonton_at:null,side_at:null,dessert_at:null,drink:false,drink_start_at:null,drink_lo_alerted_at:null,point:null,point_checked:false,
+    wonton_at:null,side_at:null,dessert_at:null,drink:false,drink_start_at:null,drink_lo_alerted_at:null,point:null,
     sansho_at:null,soup_at:null,closing_order_at:null,closing_finish_at:null,oshibori_at:null,checkout_at:null,
     pot_warm_alerted_at:null
   };
@@ -97,7 +97,7 @@ function courseSequence(g){
 }
 function drinkLoAt(g){return g?.drink_start_at?new Date(g.drink_start_at).getTime()+DRINK_LO_MS:null}
 function pointOf(g){return POINTS[g?.point]?g.point:null}
-function pointDue(g){return !!(pointOf(g)&&g.arrival_at&&!g.checkout_at&&!g.point_checked&&Date.now()-new Date(g.arrival_at).getTime()>=POINT_ALERT_MS)}
+function pointDue(g){return !!(pointOf(g)&&g.arrival_at&&!g.checkout_at&&Date.now()-new Date(g.arrival_at).getTime()>=POINT_ALERT_MS)}
 function drinkLoReached(g){const t=drinkLoAt(g);return !!(t&&drinkOn(g)&&!g.checkout_at&&Date.now()>=t)}
 function isLate(g){
   if(!g?.reservation_time||g.arrival_at||g.checkout_at)return false;
@@ -181,7 +181,7 @@ function saveCourse(){
   if(lost.length&&!confirm("コースを変更しますか？\n「"+lost.map(([l])=>l).join("・")+"」の記録は取り消されます。"))return;
   for(const [,c] of lost)g[c]=null;
   g.course=courseDraft.course;g.drink=courseDraft.drink;
-  if((g.point||null)!==courseDraft.point){g.point=courseDraft.point;g.point_checked=false}
+  g.point=courseDraft.point;
   if(!g.drink_start_at)g.drink_lo_alerted_at=null;
   save();render();
   document.getElementById("courseDialog").close();
@@ -236,7 +236,6 @@ function resetToday(){
 
 function render(){
   document.getElementById("dateLabel").textContent=dateFmt.format(new Date());
-  renderPointBanner();
   const body=document.getElementById("body");
   body.innerHTML="";
   for(let n=1;n<=9;n++){
@@ -292,19 +291,6 @@ function skippedButton(g,label,col){
     recordStep(g,col);
   };
   return b;
-}
-// ポイント引き忘れ防止：来店から1時間30分たった卓を画面の上に重ねて通知（表は動かさない。「確認した」か会計で消える）
-function renderPointBanner(){
-  const banner=document.getElementById("pointBanner");
-  const due=state.groups.filter(pointDue).sort((a,b)=>a.representative_table-b.representative_table);
-  banner.hidden=!due.length;banner.innerHTML="";
-  for(const g of due){
-    const item=document.createElement("div");item.className="point-item";
-    item.innerHTML="<span class='point-msg'><b>"+tableLabel(g)+"</b>　"+POINTS[pointOf(g)]+"　会計時に引き忘れ注意</span>";
-    const ok=document.createElement("button");ok.type="button";ok.className="btn";ok.textContent="確認した";
-    ok.onclick=()=>{g.point_checked=true;save();render()};
-    item.appendChild(ok);banner.appendChild(item);
-  }
 }
 function stepButton(g,label,col){
   const b=document.createElement("button");b.type="button";
@@ -642,10 +628,6 @@ function checkPotAlerts(){
   for(const g of state.groups){
     if(g.pot_warm_at&&!g.pot_finish_at&&!g.checkout_at&&(Date.now()-new Date(g.pot_warm_at).getTime()>=330000)&&g.pot_warm_alerted_at!==g.pot_warm_at){
       if(sendPotAlert(g)){g.pot_warm_alerted_at=g.pot_warm_at;changed=true}
-    }
-    if(pointDue(g)&&g.point_notified_at!==g.arrival_at){
-      showSystemNotification("ポイント引き忘れ注意",{body:tableLabel(g)+"　"+POINTS[pointOf(g)]+"　会計時に忘れずに",tag:"point-"+g.id,renotify:true});
-      g.point_notified_at=g.arrival_at;changed=true;
     }
     if(drinkLoReached(g)&&g.drink_lo_alerted_at!==g.drink_start_at){
       if(sendDrinkLoAlert(g)){g.drink_lo_alerted_at=g.drink_start_at;changed=true}
