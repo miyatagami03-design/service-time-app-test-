@@ -103,7 +103,7 @@ td.na{color:#b8bdc6;background:#e9ebef!important;font-weight:800}
 .step .pt{display:block;margin-top:2px;font-size:10px;color:#c2410c}
 .step.point{border-color:#fdba74}
 .step.point-due{background:#ffedd5;border:2px solid #f97316;animation:pointPulse 1.2s ease-in-out infinite}
-.point-banner{position:sticky;top:0;z-index:20;display:grid;gap:6px;margin:0 0 6px;padding:8px;border:3px solid #f97316;border-radius:12px;background:#fff7ed;animation:pointPulse 1.2s ease-in-out infinite}
+.point-banner{position:fixed;z-index:50;left:50%;bottom:16px;transform:translateX(-50%);width:min(640px,calc(100% - 24px));display:grid;gap:6px;padding:10px 12px;border:3px solid #f97316;border-radius:14px;background:#fff7ed;box-shadow:0 10px 30px rgba(0,0,0,.25);animation:pointPulse 1.2s ease-in-out infinite}
 .point-banner[hidden]{display:none}
 .point-item{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:18px;font-weight:900;color:#9a3412}
 .point-item .btn{min-height:40px;font-size:14px;border-color:#f97316;flex:0 0 auto}
