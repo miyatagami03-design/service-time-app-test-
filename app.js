@@ -23,10 +23,9 @@ const EXTRA_STEPS=[
   {label:"食後デザート",col:"dessert_at",after:"oshibori_at",courses:["kiwami"]}
 ];
 const DRINK_LO_MS=90*60*1000;
-// 会計時に使うポイント。来店から1時間30分で会計ボタンを強調する
+// 会計時に使うポイント。会計ボタンに目印として表示する
 const POINTS={ikkyu:"一休ポイント",gnavi:"ぐるなびポイント",tabelog:"食べログVポイント"};
 const POINT_SHORT={ikkyu:"一休",gnavi:"ぐるなび",tabelog:"食べログV"};
-const POINT_ALERT_MS=90*60*1000;
 const ALL_STEPS=[...STEP_DEFS,...EXTRA_STEPS.map(e=>[e.label,e.col])];
 const COL_TO_LABEL=Object.fromEntries(ALL_STEPS.map(([l,c])=>[c,l]));
 const NINE_MIN_STEPS=new Set(["amuse_at","pot_warm_at","wonton_at","side_at","sansho_at","soup_at","closing_order_at","oshibori_at"]);
@@ -97,7 +96,6 @@ function courseSequence(g){
 }
 function drinkLoAt(g){return g?.drink_start_at?new Date(g.drink_start_at).getTime()+DRINK_LO_MS:null}
 function pointOf(g){return POINTS[g?.point]?g.point:null}
-function pointDue(g){return !!(pointOf(g)&&g.arrival_at&&!g.checkout_at&&Date.now()-new Date(g.arrival_at).getTime()>=POINT_ALERT_MS)}
 function drinkLoReached(g){const t=drinkLoAt(g);return !!(t&&drinkOn(g)&&!g.checkout_at&&Date.now()>=t)}
 function isLate(g){
   if(!g?.reservation_time||g.arrival_at||g.checkout_at)return false;
@@ -295,7 +293,7 @@ function skippedButton(g,label,col){
 function stepButton(g,label,col){
   const b=document.createElement("button");b.type="button";
   const pt=col==="checkout_at"&&pointOf(g);
-  b.className="step"+(g?.[col]?" done":"")+((col==="pot_finish_at"&&potWarn(g))||nineMinWarn(g,col)?" warn":"")+(pt?" point"+(pointDue(g)?" point-due":""):"");
+  b.className="step"+(g?.[col]?" done":"")+((col==="pot_finish_at"&&potWarn(g))||nineMinWarn(g,col)?" warn":"")+(pt?" point":"");
   b.innerHTML="<span>"+labelHtml(label)+"</span>"+(pt?"<span class='pt'>"+POINT_SHORT[pt]+"P</span>":"")+(g?.[col]?"<span class='t'>"+fmtTime(g[col])+"</span>":"");
   b.onclick=()=>recordStep(g,col);
   return b;
@@ -664,11 +662,6 @@ async function testDrinkAlert(){
   const g=state.groups[4];g.drink=true;g.arrival_at=ago(92*60*1000);g.drink_start_at=ago(91*60*1000);
   save();document.getElementById("testToolsDialog").close();checkPotAlerts();render();
 }
-function testPointBanner(){
-  state=freshState();
-  const g=state.groups[6];g.point="ikkyu";g.arrival_at=ago(91*60*1000);
-  save();render();document.getElementById("testToolsDialog").close();
-}
 function testReset(){state=freshState();save();render();document.getElementById("testToolsDialog").close()}
 
 document.getElementById("historyBtn").onclick=()=>{renderHistory();document.getElementById("historyDialog").showModal()};
@@ -688,7 +681,6 @@ document.getElementById("testNineBtn").onclick=testNineWarnings;
 document.getElementById("testArrivalBtn").onclick=testArrivalWarning;
 document.getElementById("testPotBtn").onclick=testPotAlert;
 document.getElementById("testResetBtn").onclick=testReset;
-document.getElementById("testPointBtn").onclick=testPointBanner;
 document.getElementById("testDrinkBtn").onclick=testDrinkAlert;
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.close).close());
 document.addEventListener("pointerdown",()=>{if(alertEnabled())void unlockAudio()},{capture:true,passive:true});
