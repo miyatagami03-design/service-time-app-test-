@@ -23,10 +23,10 @@ const EXTRA_STEPS=[
   {label:"食後デザート",col:"dessert_at",after:"oshibori_at",courses:["kiwami"]}
 ];
 const DRINK_LO_MS=90*60*1000;
-// 会計時に使うポイント。来店から1時間15分で引き忘れ防止の表示を出す
+// 会計時に使うポイント。来店から1時間30分で引き忘れ防止の通知を出す
 const POINTS={ikkyu:"一休ポイント",gnavi:"ぐるなびポイント",tabelog:"食べログVポイント"};
 const POINT_SHORT={ikkyu:"一休",gnavi:"ぐるなび",tabelog:"食べログV"};
-const POINT_ALERT_MS=75*60*1000;
+const POINT_ALERT_MS=90*60*1000;
 const ALL_STEPS=[...STEP_DEFS,...EXTRA_STEPS.map(e=>[e.label,e.col])];
 const COL_TO_LABEL=Object.fromEntries(ALL_STEPS.map(([l,c])=>[c,l]));
 const NINE_MIN_STEPS=new Set(["amuse_at","pot_warm_at","wonton_at","side_at","sansho_at","soup_at","closing_order_at","oshibori_at"]);
@@ -293,7 +293,7 @@ function skippedButton(g,label,col){
   };
   return b;
 }
-// ポイント引き忘れ防止：来店から1時間15分たった卓を画面上部に表示（「確認した」か会計で消える）
+// ポイント引き忘れ防止：来店から1時間30分たった卓を画面の上に重ねて通知（表は動かさない。「確認した」か会計で消える）
 function renderPointBanner(){
   const banner=document.getElementById("pointBanner");
   const due=state.groups.filter(pointDue).sort((a,b)=>a.representative_table-b.representative_table);
@@ -643,6 +643,10 @@ function checkPotAlerts(){
     if(g.pot_warm_at&&!g.pot_finish_at&&!g.checkout_at&&(Date.now()-new Date(g.pot_warm_at).getTime()>=330000)&&g.pot_warm_alerted_at!==g.pot_warm_at){
       if(sendPotAlert(g)){g.pot_warm_alerted_at=g.pot_warm_at;changed=true}
     }
+    if(pointDue(g)&&g.point_notified_at!==g.arrival_at){
+      showSystemNotification("ポイント引き忘れ注意",{body:tableLabel(g)+"　"+POINTS[pointOf(g)]+"　会計時に忘れずに",tag:"point-"+g.id,renotify:true});
+      g.point_notified_at=g.arrival_at;changed=true;
+    }
     if(drinkLoReached(g)&&g.drink_lo_alerted_at!==g.drink_start_at){
       if(sendDrinkLoAlert(g)){g.drink_lo_alerted_at=g.drink_start_at;changed=true}
     }
@@ -680,7 +684,7 @@ async function testDrinkAlert(){
 }
 function testPointBanner(){
   state=freshState();
-  const g=state.groups[6];g.point="ikkyu";g.arrival_at=ago(76*60*1000);
+  const g=state.groups[6];g.point="ikkyu";g.arrival_at=ago(91*60*1000);
   save();render();document.getElementById("testToolsDialog").close();
 }
 function testReset(){state=freshState();save();render();document.getElementById("testToolsDialog").close()}
