@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="接客時間管理">
-<link rel="manifest" href="./manifest.webmanifest?v=242t">
+<link rel="manifest" href="./manifest.webmanifest?v=250t">
 <link rel="apple-touch-icon" href="../icon-180.png">
-<link rel="stylesheet" href="./style.css?v=242t">
+<link rel="stylesheet" href="./style.css?v=250t">
 <title>接客時間管理</title>
 </head>
 <body>
@@ -30,7 +30,7 @@
       <button id="testToolsBtn" class="btn" type="button">テスト補助</button>
         <button id="resetBtn" class="btn" type="button">今日をリセット</button>
       </div>
-    <button id="versionBtn" class="version" type="button">Ver.2.4.2 TEST</button>
+    <button id="versionBtn" class="version" type="button">Ver.2.5.0 TEST</button>
     </div>
   </div>
 
@@ -72,6 +72,10 @@
 <dialog id="versionDialog">
   <div class="dialog-body">
     <h3>更新履歴</h3>
+    <div class="history-card">
+      <div class="history-title">Ver.2.5.0 TEST</div>
+      <div class="history-sub">トイレチェック（17時・19時・21時にトイレの音でアラーム）／2時間制の卓は卓番を色分けし退店5分前にアラーム</div>
+    </div>
     <div class="history-card">
       <div class="history-title">Ver.2.4.2 TEST</div>
       <div class="history-sub">ポイント（一休／ぐるなび／食べログV）の引き忘れ防止：会計ボタンにポイント名を表示し、来店から1時間30分でオレンジに強調</div>
@@ -159,6 +163,8 @@
       <button id="testPotBtn" class="btn" type="button">鍋5分30秒アラートを発火</button>
       <button id="testDrinkBtn" class="btn" type="button">飲み放題L.O.アラートを発火</button>
       <button id="testPointBtn" class="btn" type="button">ポイント引き忘れ表示を確認</button>
+      <button id="testToiletBtn" class="btn" type="button">トイレチェックの音を鳴らす</button>
+      <button id="testLimitBtn" class="btn" type="button">2時間制 退店5分前アラートを発火</button>
       <button id="testResetBtn" class="btn" type="button">TESTデータを初期化</button>
     </div>
     <div class="dialog-actions"><button class="btn" data-close="testToolsDialog">閉じる</button></div>
@@ -183,6 +189,7 @@
     <h3 id="courseTitle">コース</h3>
     <div id="courseChoices" class="choice-grid"></div>
     <button id="drinkToggle" class="drink-toggle" type="button"></button>
+    <button id="limitToggle" class="drink-toggle limit-toggle" type="button"></button>
     <div class="point-label">ポイント利用（会計時）</div>
     <div id="pointChoices" class="point-grid"></div>
     <div class="dialog-actions">
@@ -207,6 +214,6 @@
   </div>
 </dialog>
 
-<script src="./app.js?v=242t"></script>
+<script src="./app.js?v=250t"></script>
 </body>
 </html>
