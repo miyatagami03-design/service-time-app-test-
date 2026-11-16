@@ -27,6 +27,9 @@ const DRINK_LO_MS=90*60*1000;
 const POINTS={ikkyu:"一休ポイント",gnavi:"ぐるなびポイント",tabelog:"食べログVポイント"};
 const POINT_SHORT={ikkyu:"一休",gnavi:"ぐるなび",tabelog:"食べログV"};
 const POINT_ALERT_MS=90*60*1000;
+const TOILET_TIMES=["17:00","19:00","21:00"];
+const TOILET_ALERT_WINDOW_MS=30*60*1000;
+const LIMIT_MS=120*60*1000,LIMIT_WARN_BEFORE_MS=5*60*1000;
 const ALL_STEPS=[...STEP_DEFS,...EXTRA_STEPS.map(e=>[e.label,e.col])];
 const COL_TO_LABEL=Object.fromEntries(ALL_STEPS.map(([l,c])=>[c,l]));
 const NINE_MIN_STEPS=new Set(["amuse_at","pot_warm_at","wonton_at","side_at","sansho_at","soup_at","closing_order_at","oshibori_at"]);
@@ -42,8 +45,8 @@ let linkSelected=new Set();
 let moveSource=null;
 let moveTarget=null;
 let audioCtx=null;
-let alertAudio=null;
-let alertAudioUrl=null;
+const alertAudios={},alertAudioUrls={};
+let alertKind="chime";
 let alertLoopTimer=null;
 let alertActive=false;
 
@@ -52,13 +55,13 @@ function blankGroup(n){
     id:crypto.randomUUID?crypto.randomUUID():String(Date.now())+"-"+n+"-"+Math.random(),
     representative_table:n,linked_tables:[n],reservation_time:null,course:"normal",
     arrival_at:null,explanation_at:null,starter_at:null,amuse_at:null,pot_warm_at:null,pot_finish_at:null,
-    wonton_at:null,side_at:null,dessert_at:null,drink:false,drink_start_at:null,drink_lo_alerted_at:null,point:null,
+    wonton_at:null,side_at:null,dessert_at:null,drink:false,drink_start_at:null,drink_lo_alerted_at:null,point:null,limit2h:false,limit_alerted_at:null,
     sansho_at:null,soup_at:null,closing_order_at:null,closing_finish_at:null,oshibori_at:null,checkout_at:null,
     pot_warm_alerted_at:null
   };
 }
 function freshState(){
-  return {date:JST_DATE(),groups:Array.from({length:9},(_,i)=>blankGroup(i+1)),history:[]};
+  return {date:JST_DATE(),groups:Array.from({length:9},(_,i)=>blankGroup(i+1)),history:[],toilet:{done:{},alerted:{}}};
 }
 function loadState(){
   try{
@@ -81,7 +84,7 @@ function hasService(g){return ALL_STEPS.some(([,c])=>!!g[c])}
 function courseOf(g){return COURSES[g?.course]?g.course:"normal"}
 function drinkOn(g){return !!(COURSES[courseOf(g)].drink||g?.drink)}
 function courseLabel(g,short){return COURSES[courseOf(g)].label+(g?.drink&&!COURSES[courseOf(g)].drink?(short?" +飲":"＋飲み放題"):"")}
-function hasCourseSetting(g){return courseOf(g)!=="normal"||!!g?.drink||!!pointOf(g)}
+function hasCourseSetting(g){return courseOf(g)!=="normal"||!!g?.drink||!!pointOf(g)||!!g?.limit2h}
 // skipの項目も、記録済み（追加注文）なら通常どおり扱う。unlock＝この項目が記録されたら使えるようにする
 function stepAvailable(g,col){
   const c=COURSES[courseOf(g)];
@@ -143,7 +146,7 @@ let courseTarget=null,courseDraft=null;
 function openCourse(g){
   if(!g)return;
   courseTarget=g;
-  courseDraft={course:courseOf(g),drink:!!g.drink,point:pointOf(g)};
+  courseDraft={course:courseOf(g),drink:!!g.drink,point:pointOf(g),limit:!!g.limit2h};
   document.getElementById("courseTitle").textContent=tableLabel(g)+"のコース";
   renderCourseDialog();
   document.getElementById("courseDialog").showModal();
@@ -161,6 +164,9 @@ function renderCourseDialog(){
   dt.disabled=included;
   dt.className="drink-toggle"+(included||courseDraft.drink?" on":"");
   dt.textContent=included?"飲み放題：コースに込み":"飲み放題："+(courseDraft.drink?"あり（タップで外す）":"なし（タップで付ける）");
+  const lt=document.getElementById("limitToggle");
+  lt.className="drink-toggle limit-toggle"+(courseDraft.limit?" on":"");
+  lt.textContent="2時間制（入れ替えあり）："+(courseDraft.limit?"あり（タップで外す）":"なし（タップで付ける）");
   const pb=document.getElementById("pointChoices");pb.innerHTML="";
   for(const [key,label] of [[null,"なし"],...Object.entries(POINT_SHORT)]){
     const b=document.createElement("button");b.type="button";
@@ -173,6 +179,10 @@ function toggleDraftDrink(){
   if(!courseDraft||COURSES[courseDraft.course].drink)return;
   courseDraft.drink=!courseDraft.drink;renderCourseDialog();
 }
+function toggleDraftLimit(){
+  if(!courseDraft)return;
+  courseDraft.limit=!courseDraft.limit;renderCourseDialog();
+}
 function saveCourse(){
   const g=courseTarget;
   if(!g||!courseDraft)return;
@@ -182,6 +192,7 @@ function saveCourse(){
   for(const [,c] of lost)g[c]=null;
   g.course=courseDraft.course;g.drink=courseDraft.drink;
   g.point=courseDraft.point;
+  if(!!g.limit2h!==courseDraft.limit){g.limit2h=courseDraft.limit;g.limit_alerted_at=null}
   if(!g.drink_start_at)g.drink_lo_alerted_at=null;
   save();render();
   document.getElementById("courseDialog").close();
@@ -242,6 +253,7 @@ function render(){
     const g=groupForTable(n);
     const tr=document.createElement("tr");
     const seat=document.createElement("td");seat.className="seatcell";seat.textContent=n;tr.appendChild(seat);
+    if(g?.limit2h)seat.classList.add(limitSoon(g)?"limit-soon":"limit");
 
     if(g && g.representative_table!==n){
       const td=document.createElement("td");td.colSpan=14;td.className="linked-placeholder";
@@ -264,7 +276,13 @@ function render(){
 
     const tdEl=document.createElement("td");
     const sp=document.createElement("span");sp.className="elapsed"+(arrivalWarn(g)?" danger":"");sp.textContent=elapsedFrom(g?.arrival_at);
-    tdEl.appendChild(sp);tr.appendChild(tdEl);
+    tdEl.appendChild(sp);
+    if(g?.limit2h){
+      const le=document.createElement("span");le.className="limit-end"+(limitSoon(g)?" soon":"");
+      le.textContent=limitEndAt(g)?"退店 "+fmtTime(limitEndAt(g)):"2時間制";
+      tdEl.appendChild(le);
+    }
+    tr.appendChild(tdEl);
 
     for(const [label,col] of STEP_DEFS){
       const td=document.createElement("td");
@@ -281,7 +299,41 @@ function render(){
     body.appendChild(tr);
     if(extras.length)body.appendChild(extraRow(g,extras));
   }
+  body.appendChild(toiletRow());
 }
+// トイレチェック（卓とは別）。決まった時刻にトイレの音でアラーム
+function toiletState(){if(!state.toilet)state.toilet={done:{},alerted:{}};return state.toilet}
+function jstTodayAt(hhmm){return new Date(JST_DATE()+"T"+hhmm+":00+09:00").getTime()}
+function toiletDue(t){return !toiletState().done[t]&&Date.now()>=jstTodayAt(t)}
+function recordToilet(t){
+  const ts=toiletState();
+  if(ts.done[t]){
+    if(!confirm(t+"のトイレチェックの記録を取り消しますか？"))return;
+    ts.done[t]=null;
+  }else{
+    ts.done[t]=new Date().toISOString();
+    if(alertActive&&alertKind==="flush")stopAlertSound();
+  }
+  save();render();
+}
+function toiletRow(){
+  const tr=document.createElement("tr");tr.className="toilet-row";
+  const head=document.createElement("td");head.colSpan=3;head.className="toilet-head";head.textContent="トイレチェック";
+  tr.appendChild(head);
+  const td=document.createElement("td");td.colSpan=12;td.className="toilet-cell";
+  for(const t of TOILET_TIMES){
+    const done=toiletState().done[t];
+    const b=document.createElement("button");b.type="button";
+    b.className="step toilet-btn"+(done?" done":toiletDue(t)?" warn toilet-due":"");
+    b.innerHTML="<span>"+t+"</span>"+(done?"<span class='t'>済 "+fmtTime(done)+"</span>":"");
+    b.onclick=()=>recordToilet(t);td.appendChild(b);
+  }
+  tr.appendChild(td);
+  return tr;
+}
+// 2時間制：来店から2時間で退店。5分前から卓番を赤にしてアラーム
+function limitEndAt(g){return g?.limit2h&&g.arrival_at?new Date(g.arrival_at).getTime()+LIMIT_MS:null}
+function limitSoon(g){const t=limitEndAt(g);return !!(t&&!g.checkout_at&&Date.now()>=t-LIMIT_WARN_BEFORE_MS)}
 // コースに無い項目（グレー）。追加注文のときだけタップで記録できる
 function skippedButton(g,label,col){
   const b=document.createElement("button");b.type="button";b.className="step skipped";
@@ -452,46 +504,65 @@ function getAudioContext(){
     return audioCtx;
   }catch{return null}
 }
-function createAlertWaveUrl(){
+// アラーム音を合成する。chime＝ピピピ、flush＝トイレの水を流す音（ザーッ→ゴボゴボ）
+function alertSamples(kind,sampleRate){
+  if(kind==="flush"){
+    const n=Math.ceil(sampleRate*2.6),out=new Float32Array(n);
+    let seed=12345,lp=0,lp2=0;
+    const rnd=()=>(seed=seed*16807%2147483647)/1073741823.5-1;
+    for(let i=0;i<n;i++){
+      const t=i/sampleRate;
+      const env=t<.12?t/.12:t<1.5?1:Math.max(0,1-(t-1.5)/1.1);
+      const a=.06+.3*Math.max(0,1-t/2.2);
+      lp+=a*(rnd()-lp);lp2+=a*(lp-lp2);
+      const gurgle=t<.9?1:.5+.5*Math.max(0,Math.sin(2*Math.PI*(7+4*Math.sin(t*5))*t));
+      const swirl=.05*Math.sin(2*Math.PI*(220-60*t)*t);
+      out[i]=Math.max(-1,Math.min(1,(lp2*1.5*gurgle+swirl)*env));
+    }
+    return out;
+  }
+  const n=Math.ceil(sampleRate*.62),out=new Float32Array(n);
+  const tones=[[0,.16,880],[.22,.38,880],[.44,.60,1046]];
+  for(let i=0;i<n;i++){
+    const t=i/sampleRate;
+    for(const [start,end,frequency] of tones){
+      if(t>=start&&t<end){
+        const local=t-start,envelope=Math.min(1,local/.012,(end-t)/.025);
+        out[i]=Math.sin(2*Math.PI*frequency*local)*.34*Math.max(0,envelope);
+        break;
+      }
+    }
+  }
+  return out;
+}
+function createAlertWaveUrl(kind){
   try{
-    if(alertAudioUrl)return alertAudioUrl;
-    const sampleRate=12000,duration=.62,sampleCount=Math.ceil(sampleRate*duration);
+    if(alertAudioUrls[kind])return alertAudioUrls[kind];
+    const sampleRate=12000,samples=alertSamples(kind,sampleRate),sampleCount=samples.length;
     const buffer=new ArrayBuffer(44+sampleCount*2),view=new DataView(buffer);
     const write=(offset,text)=>{for(let i=0;i<text.length;i++)view.setUint8(offset+i,text.charCodeAt(i))};
     write(0,"RIFF");view.setUint32(4,36+sampleCount*2,true);write(8,"WAVE");write(12,"fmt ");
     view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
     view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);view.setUint16(32,2,true);view.setUint16(34,16,true);
     write(36,"data");view.setUint32(40,sampleCount*2,true);
-    const tones=[[0,.16,880],[.22,.38,880],[.44,.60,1046]];
-    for(let i=0;i<sampleCount;i++){
-      const t=i/sampleRate;
-      let sample=0;
-      for(const [start,end,frequency] of tones){
-        if(t>=start&&t<end){
-          const local=t-start,envelope=Math.min(1,local/.012,(end-t)/.025);
-          sample=Math.sin(2*Math.PI*frequency*local)*.34*Math.max(0,envelope);
-          break;
-        }
-      }
-      view.setInt16(44+i*2,Math.round(sample*32767),true);
-    }
-    alertAudioUrl=URL.createObjectURL(new Blob([buffer],{type:"audio/wav"}));
-    return alertAudioUrl;
+    for(let i=0;i<sampleCount;i++)view.setInt16(44+i*2,Math.round(samples[i]*32767),true);
+    alertAudioUrls[kind]=URL.createObjectURL(new Blob([buffer],{type:"audio/wav"}));
+    return alertAudioUrls[kind];
   }catch{return null}
 }
-function getAlertAudio(){
+function getAlertAudio(kind=alertKind){
   try{
-    if(alertAudio)return alertAudio;
-    const url=createAlertWaveUrl();
+    if(alertAudios[kind])return alertAudios[kind];
+    const url=createAlertWaveUrl(kind);
     if(!url||typeof Audio==="undefined")return null;
-    alertAudio=new Audio(url);
-    alertAudio.preload="auto";
-    alertAudio.playsInline=true;
-    return alertAudio;
+    const audio=new Audio(url);
+    audio.preload="auto";
+    audio.playsInline=true;
+    alertAudios[kind]=audio;
+    return audio;
   }catch{return null}
 }
-async function unlockMediaAudio(){
-  const audio=getAlertAudio();
+async function unlockOneMedia(audio){
   if(!audio)return false;
   try{
     audio.muted=true;audio.currentTime=0;
@@ -503,8 +574,13 @@ async function unlockMediaAudio(){
     return false;
   }
 }
+async function unlockMediaAudio(){
+  let ok=false;
+  for(const kind of ["chime","flush"])ok=(await unlockOneMedia(getAlertAudio(kind)))||ok;
+  return ok;
+}
 async function playMediaAlertSound(){
-  const audio=getAlertAudio();
+  const audio=getAlertAudio(alertKind);
   if(!audio)return false;
   try{
     audio.muted=false;audio.currentTime=0;
@@ -574,28 +650,22 @@ async function playAlertSound(){
   try{
     const ctx=await ensureAudioReady();
     if(!ctx||ctx.state!=="running")return;
-    const now=ctx.currentTime;
-    [0,.22,.44].forEach((offset,i)=>{
-      const osc=ctx.createOscillator(),gain=ctx.createGain();
-      osc.connect(gain);gain.connect(ctx.destination);
-      osc.type="sine";osc.frequency.value=i===2?1046:880;
-      gain.gain.setValueAtTime(.0001,now+offset);
-      gain.gain.exponentialRampToValueAtTime(.24,now+offset+.015);
-      gain.gain.exponentialRampToValueAtTime(.0001,now+offset+.16);
-      osc.start(now+offset);osc.stop(now+offset+.18);
-    });
+    const data=alertSamples(alertKind,ctx.sampleRate);
+    const buf=ctx.createBuffer(1,data.length,ctx.sampleRate);buf.getChannelData(0).set(data);
+    const src=ctx.createBufferSource();src.buffer=buf;src.connect(ctx.destination);src.start();
   }catch{}
 }
-function startAlertSound(){
+function startAlertSound(kind="chime"){
   if(!alertEnabled())return;
   stopAlertSound();
+  alertKind=kind;
   alertActive=true;syncStopButton();
   void playAlertSound();
   alertLoopTimer=setInterval(()=>void playAlertSound(),6500);
 }
 function stopAlertSound(){
   if(alertLoopTimer!==null){clearInterval(alertLoopTimer);alertLoopTimer=null}
-  if(alertAudio){try{alertAudio.pause();alertAudio.currentTime=0}catch{}}
+  for(const a of Object.values(alertAudios)){try{a.pause();a.currentTime=0}catch{}}
   alertActive=false;syncStopButton();
 }
 async function showSystemNotification(title,options){
@@ -609,9 +679,9 @@ async function showSystemNotification(title,options){
     if("Notification" in window&&Notification.permission==="granted")new Notification(title,opts);
   }catch{}
 }
-function sendAlert(title,text,tag){
+function sendAlert(title,text,tag,kind){
   if(!alertEnabled())return false;
-  startAlertSound();
+  startAlertSound(kind);
   if("Notification" in window&&Notification.permission==="granted"){
     showSystemNotification(title,{body:text,tag,renotify:true});
   }
@@ -629,8 +699,18 @@ function checkPotAlerts(){
     if(g.pot_warm_at&&!g.pot_finish_at&&!g.checkout_at&&(Date.now()-new Date(g.pot_warm_at).getTime()>=330000)&&g.pot_warm_alerted_at!==g.pot_warm_at){
       if(sendPotAlert(g)){g.pot_warm_alerted_at=g.pot_warm_at;changed=true}
     }
+    if(limitSoon(g)&&g.limit_alerted_at!==g.arrival_at){
+      if(sendAlert("退店5分前",tableLabel(g)+"は2時間制です。退店時刻 "+fmtTime(limitEndAt(g)),"limit-"+g.id)){g.limit_alerted_at=g.arrival_at;changed=true}
+    }
     if(drinkLoReached(g)&&g.drink_lo_alerted_at!==g.drink_start_at){
       if(sendDrinkLoAlert(g)){g.drink_lo_alerted_at=g.drink_start_at;changed=true}
+    }
+  }
+  const ts=toiletState();
+  for(const t of TOILET_TIMES){
+    const at=jstTodayAt(t);
+    if(!ts.done[t]&&!ts.alerted[t]&&Date.now()>=at&&Date.now()-at<TOILET_ALERT_WINDOW_MS){
+      if(sendAlert("トイレチェック",t+"のトイレチェックの時間です","toilet-"+t,"flush")){ts.alerted[t]=true;changed=true}
     }
   }
   if(changed)save();
@@ -669,6 +749,22 @@ function testPointBanner(){
   const g=state.groups[6];g.point="ikkyu";g.arrival_at=ago(91*60*1000);
   save();render();document.getElementById("testToolsDialog").close();
 }
+async function testToiletAlert(){
+  if(!alertEnabled())setAlertEnabled(true);
+  await unlockAudio();
+  await requestNotificationPermission();
+  document.getElementById("testToolsDialog").close();
+  sendAlert("トイレチェック","トイレチェックのテストです","toilet-test","flush");
+}
+async function testLimitAlert(){
+  if(!alertEnabled())setAlertEnabled(true);
+  await unlockAudio();
+  await requestNotificationPermission();
+  state=freshState();
+  const g=state.groups[2];g.limit2h=true;g.arrival_at=ago(116*60*1000);
+  state.groups[5].limit2h=true;state.groups[5].arrival_at=ago(30*60*1000);
+  save();document.getElementById("testToolsDialog").close();checkPotAlerts();render();
+}
 function testReset(){state=freshState();save();render();document.getElementById("testToolsDialog").close()}
 
 document.getElementById("historyBtn").onclick=()=>{renderHistory();document.getElementById("historyDialog").showModal()};
@@ -681,6 +777,7 @@ document.getElementById("confirmMoveBtn").onclick=confirmMove;
 document.getElementById("alertToggle").onclick=toggleAlerts;
 document.getElementById("stopAlertBtn").onclick=stopAlertSound;
 document.getElementById("drinkToggle").onclick=toggleDraftDrink;
+document.getElementById("limitToggle").onclick=toggleDraftLimit;
 document.getElementById("courseSaveBtn").onclick=saveCourse;
 document.getElementById("testAlertBtn").onclick=testPotAlert;
 document.getElementById("testToolsBtn").onclick=openTestTools;
@@ -688,6 +785,8 @@ document.getElementById("testNineBtn").onclick=testNineWarnings;
 document.getElementById("testArrivalBtn").onclick=testArrivalWarning;
 document.getElementById("testPotBtn").onclick=testPotAlert;
 document.getElementById("testResetBtn").onclick=testReset;
+document.getElementById("testToiletBtn").onclick=testToiletAlert;
+document.getElementById("testLimitBtn").onclick=testLimitAlert;
 document.getElementById("testPointBtn").onclick=testPointBanner;
 document.getElementById("testDrinkBtn").onclick=testDrinkAlert;
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.close).close());

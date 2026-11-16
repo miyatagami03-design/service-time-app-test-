@@ -104,3 +104,13 @@ td.na{color:#b8bdc6;background:#e9ebef!important;font-weight:800}
 .step.point{border-color:#fdba74}
 .step.point-due{background:#ffedd5;border:2px solid #f97316;animation:pointPulse 1.2s ease-in-out infinite}
 @keyframes pointPulse{0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,.0)}50%{box-shadow:0 0 0 6px rgba(249,115,22,.35)}}
+.seatcell.limit{background:#fef3c7;color:#92400e;box-shadow:inset 0 0 0 3px #f59e0b}
+.seatcell.limit-soon{background:#fee2e2;color:#991b1b;box-shadow:inset 0 0 0 3px #dc2626}
+.limit-end{display:block;margin-top:3px;font-size:10px;font-weight:800;color:#92400e;white-space:nowrap}
+.limit-end.soon{color:#dc2626}
+.limit-toggle.on{background:#fef3c7;border-color:#f59e0b;color:#92400e}
+.toilet-row td{background:#f0f9ff;border-top:2px solid #7dd3fc}
+.toilet-head{font-size:13px;font-weight:900;color:#0c4a6e}
+.toilet-cell{text-align:left!important;padding:4px 8px!important}
+.toilet-btn{display:inline-block;width:auto;min-width:120px;margin-right:8px;vertical-align:middle;font-size:13px}
+.toilet-due{animation:pointPulse 1.2s ease-in-out infinite}
