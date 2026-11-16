@@ -312,7 +312,7 @@ function recordToilet(t){
     ts.done[t]=null;
   }else{
     ts.done[t]=new Date().toISOString();
-    if(alertActive&&alertKind==="flush")stopAlertSound();
+    if(alertActive&&alertKind==="gentle")stopAlertSound();
   }
   save();render();
 }
@@ -504,20 +504,20 @@ function getAudioContext(){
     return audioCtx;
   }catch{return null}
 }
-// アラーム音を合成する。chime＝ピピピ、flush＝トイレの水を流す音（ザーッ→ゴボゴボ）
+// アラーム音を合成する。chime＝ピピピ、gentle＝穏やかなポーン・ポーン・ポーン（トイレチェック用）
 function alertSamples(kind,sampleRate){
-  if(kind==="flush"){
+  if(kind==="gentle"){
     const n=Math.ceil(sampleRate*2.6),out=new Float32Array(n);
-    let seed=12345,lp=0,lp2=0;
-    const rnd=()=>(seed=seed*16807%2147483647)/1073741823.5-1;
+    const notes=[[0,659.25],[.5,523.25],[1,392]];
     for(let i=0;i<n;i++){
       const t=i/sampleRate;
-      const env=t<.12?t/.12:t<1.5?1:Math.max(0,1-(t-1.5)/1.1);
-      const a=.06+.3*Math.max(0,1-t/2.2);
-      lp+=a*(rnd()-lp);lp2+=a*(lp-lp2);
-      const gurgle=t<.9?1:.5+.5*Math.max(0,Math.sin(2*Math.PI*(7+4*Math.sin(t*5))*t));
-      const swirl=.05*Math.sin(2*Math.PI*(220-60*t)*t);
-      out[i]=Math.max(-1,Math.min(1,(lp2*1.5*gurgle+swirl)*env));
+      let s=0;
+      for(const [start,f] of notes){
+        if(t<start)continue;
+        const local=t-start,env=Math.min(1,local/.02)*Math.exp(-local*2.4);
+        s+=env*(Math.sin(2*Math.PI*f*local)+.25*Math.sin(4*Math.PI*f*local)+.06*Math.sin(6*Math.PI*f*local));
+      }
+      out[i]=s*.2;
     }
     return out;
   }
@@ -576,7 +576,7 @@ async function unlockOneMedia(audio){
 }
 async function unlockMediaAudio(){
   let ok=false;
-  for(const kind of ["chime","flush"])ok=(await unlockOneMedia(getAlertAudio(kind)))||ok;
+  for(const kind of ["chime","gentle"])ok=(await unlockOneMedia(getAlertAudio(kind)))||ok;
   return ok;
 }
 async function playMediaAlertSound(){
@@ -710,7 +710,7 @@ function checkPotAlerts(){
   for(const t of TOILET_TIMES){
     const at=jstTodayAt(t);
     if(!ts.done[t]&&!ts.alerted[t]&&Date.now()>=at&&Date.now()-at<TOILET_ALERT_WINDOW_MS){
-      if(sendAlert("トイレチェック",t+"のトイレチェックの時間です","toilet-"+t,"flush")){ts.alerted[t]=true;changed=true}
+      if(sendAlert("トイレチェック",t+"のトイレチェックの時間です","toilet-"+t,"gentle")){ts.alerted[t]=true;changed=true}
     }
   }
   if(changed)save();
@@ -754,7 +754,7 @@ async function testToiletAlert(){
   await unlockAudio();
   await requestNotificationPermission();
   document.getElementById("testToolsDialog").close();
-  sendAlert("トイレチェック","トイレチェックのテストです","toilet-test","flush");
+  sendAlert("トイレチェック","トイレチェックのテストです","toilet-test","gentle");
 }
 async function testLimitAlert(){
   if(!alertEnabled())setAlertEnabled(true);
