@@ -29,6 +29,8 @@ const POINT_SHORT={ikkyu:"一休",gnavi:"ぐるなび",tabelog:"食べログV"};
 const POINT_ALERT_MS=90*60*1000;
 const TOILET_TIMES=["17:00","19:00","21:00"];
 const TOILET_ALERT_WINDOW_MS=30*60*1000;
+// TEST版ではトイレチェックの時刻アラームを鳴らさない（音の確認は「テスト補助」から）
+const TOILET_AUTO_ALARM=false;
 const LIMIT_MS=120*60*1000,LIMIT_WARN_BEFORE_MS=5*60*1000;
 const ALL_STEPS=[...STEP_DEFS,...EXTRA_STEPS.map(e=>[e.label,e.col])];
 const COL_TO_LABEL=Object.fromEntries(ALL_STEPS.map(([l,c])=>[c,l]));
@@ -714,7 +716,7 @@ function checkPotAlerts(){
   const ts=toiletState();
   for(const t of TOILET_TIMES){
     const at=jstTodayAt(t);
-    if(!ts.done[t]&&!ts.alerted[t]&&Date.now()>=at&&Date.now()-at<TOILET_ALERT_WINDOW_MS){
+    if(TOILET_AUTO_ALARM&&!ts.done[t]&&!ts.alerted[t]&&Date.now()>=at&&Date.now()-at<TOILET_ALERT_WINDOW_MS){
       if(sendAlert("トイレチェック",t+"のトイレチェックの時間です","toilet-"+t,"gentle")){ts.alerted[t]=true;changed=true}
     }
   }
