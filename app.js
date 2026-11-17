@@ -48,6 +48,9 @@ let audioCtx=null;
 const alertAudios={},alertAudioUrls={};
 let alertKind="chime";
 let alertLoopTimer=null;
+let alertAutoStopTimer=null;
+// 鳴りっぱなしを防ぐため、アラーム音は30分で自動停止（休業日など誰もいないとき用）
+const ALERT_AUTO_STOP_MS=30*60*1000;
 let alertActive=false;
 
 function blankGroup(n){
@@ -662,9 +665,11 @@ function startAlertSound(kind="chime"){
   alertActive=true;syncStopButton();
   void playAlertSound();
   alertLoopTimer=setInterval(()=>void playAlertSound(),6500);
+  alertAutoStopTimer=setTimeout(stopAlertSound,ALERT_AUTO_STOP_MS);
 }
 function stopAlertSound(){
   if(alertLoopTimer!==null){clearInterval(alertLoopTimer);alertLoopTimer=null}
+  if(alertAutoStopTimer!==null){clearTimeout(alertAutoStopTimer);alertAutoStopTimer=null}
   for(const a of Object.values(alertAudios)){try{a.pause();a.currentTime=0}catch{}}
   alertActive=false;syncStopButton();
 }
