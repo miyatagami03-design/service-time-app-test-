@@ -114,3 +114,4 @@ td.na{color:#b8bdc6;background:#e9ebef!important;font-weight:800}
 .toilet-cell{text-align:left!important;padding:4px 8px!important}
 .toilet-btn{display:inline-block;width:auto;min-width:120px;margin-right:8px;vertical-align:middle;font-size:13px}
 .toilet-due{animation:pointPulse 1.2s ease-in-out infinite}
+.plate-toggle.on{background:#fce7f3;border-color:#db2777;color:#831843}

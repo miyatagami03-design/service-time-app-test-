@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="接客時間管理">
-<link rel="manifest" href="./manifest.webmanifest?v=253t">
+<link rel="manifest" href="./manifest.webmanifest?v=260t">
 <link rel="apple-touch-icon" href="../icon-180.png">
-<link rel="stylesheet" href="./style.css?v=253t">
+<link rel="stylesheet" href="./style.css?v=260t">
 <title>接客時間管理</title>
 </head>
 <body>
@@ -30,7 +30,7 @@
       <button id="testToolsBtn" class="btn" type="button">テスト補助</button>
         <button id="resetBtn" class="btn" type="button">今日をリセット</button>
       </div>
-    <button id="versionBtn" class="version" type="button">Ver.2.5.3 TEST</button>
+    <button id="versionBtn" class="version" type="button">Ver.2.6.0 TEST</button>
     </div>
   </div>
 
@@ -72,6 +72,10 @@
 <dialog id="versionDialog">
   <div class="dialog-body">
     <h3>更新履歴</h3>
+    <div class="history-card">
+      <div class="history-title">Ver.2.6.0 TEST</div>
+      <div class="history-sub">デザートプレートを追加（コース画面で選択）：〆作り終わりの後に「デザプレ前の片付け」「デザートプレート」、〆から5分で片付けアラーム</div>
+    </div>
     <div class="history-card">
       <div class="history-title">Ver.2.5.3 TEST</div>
       <div class="history-sub">TEST版ではトイレチェックの時刻アラームを鳴らさないように変更（音の確認はテスト補助から）</div>
@@ -177,6 +181,7 @@
       <button id="testPointBtn" class="btn" type="button">ポイント引き忘れ表示を確認</button>
       <button id="testToiletBtn" class="btn" type="button">トイレチェックの音を鳴らす</button>
       <button id="testLimitBtn" class="btn" type="button">2時間制 退店5分前アラートを発火</button>
+      <button id="testPlateBtn" class="btn" type="button">デザプレ片付けアラートを発火</button>
       <button id="testResetBtn" class="btn" type="button">TESTデータを初期化</button>
     </div>
     <div class="dialog-actions"><button class="btn" data-close="testToolsDialog">閉じる</button></div>
@@ -202,6 +207,7 @@
     <div id="courseChoices" class="choice-grid"></div>
     <button id="drinkToggle" class="drink-toggle" type="button"></button>
     <button id="limitToggle" class="drink-toggle limit-toggle" type="button"></button>
+    <button id="plateToggle" class="drink-toggle plate-toggle" type="button"></button>
     <div class="point-label">ポイント利用（会計時）</div>
     <div id="pointChoices" class="point-grid"></div>
     <div class="dialog-actions">
@@ -226,6 +232,6 @@
   </div>
 </dialog>
 
-<script src="./app.js?v=253t"></script>
+<script src="./app.js?v=260t"></script>
 </body>
 </html>
