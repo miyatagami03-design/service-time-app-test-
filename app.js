@@ -20,6 +20,8 @@ const EXTRA_STEPS=[
   {label:"アミューズ",col:"amuse_at",after:"starter_at",courses:["kamo","kiwami"]},
   {label:"ワンタン",col:"wonton_at",after:"pot_finish_at",courses:["kiwami"]},
   {label:"副材料",col:"side_at",after:"pot_finish_at",courses:["kiwami"]},
+  {label:"デザプレ前の片付け",col:"cleanup_at",after:"closing_finish_at",plate:true},
+  {label:"デザートプレート",col:"plate_at",after:"closing_finish_at",plate:true},
   {label:"食後デザート",col:"dessert_at",after:"oshibori_at",courses:["kiwami"]}
 ];
 const DRINK_LO_MS=90*60*1000;
@@ -27,6 +29,9 @@ const DRINK_LO_MS=90*60*1000;
 const POINTS={ikkyu:"一休ポイント",gnavi:"ぐるなびポイント",tabelog:"食べログVポイント"};
 const POINT_SHORT={ikkyu:"一休",gnavi:"ぐるなび",tabelog:"食べログV"};
 const POINT_ALERT_MS=90*60*1000;
+// デザートプレート：〆作り終わりから5分で片付けのアラーム（9分警告の順番には含めない）
+const PLATE_CLEANUP_MS=5*60*1000;
+const PLATE_COLS=new Set(["cleanup_at","plate_at"]);
 const TOILET_TIMES=["17:00","19:00","21:00"];
 const TOILET_ALERT_WINDOW_MS=30*60*1000;
 // TEST版ではトイレチェックの時刻アラームを鳴らさない（音の確認は「テスト補助」から）
@@ -60,7 +65,7 @@ function blankGroup(n){
     id:crypto.randomUUID?crypto.randomUUID():String(Date.now())+"-"+n+"-"+Math.random(),
     representative_table:n,linked_tables:[n],reservation_time:null,course:"normal",
     arrival_at:null,explanation_at:null,starter_at:null,amuse_at:null,pot_warm_at:null,pot_finish_at:null,
-    wonton_at:null,side_at:null,dessert_at:null,drink:false,drink_start_at:null,drink_lo_alerted_at:null,point:null,limit2h:false,limit_alerted_at:null,
+    wonton_at:null,side_at:null,dessert_at:null,drink:false,drink_start_at:null,drink_lo_alerted_at:null,point:null,limit2h:false,limit_alerted_at:null,dessert_plate:false,cleanup_at:null,plate_at:null,plate_alerted_at:null,
     sansho_at:null,soup_at:null,closing_order_at:null,closing_finish_at:null,oshibori_at:null,checkout_at:null,
     pot_warm_alerted_at:null
   };
@@ -88,8 +93,8 @@ function groupForTable(n){return state.groups.find(g=>(g.linked_tables||[]).incl
 function hasService(g){return ALL_STEPS.some(([,c])=>!!g[c])}
 function courseOf(g){return COURSES[g?.course]?g.course:"normal"}
 function drinkOn(g){return !!(COURSES[courseOf(g)].drink||g?.drink)}
-function courseLabel(g,short){return COURSES[courseOf(g)].label+(g?.drink&&!COURSES[courseOf(g)].drink?(short?" +飲":"＋飲み放題"):"")}
-function hasCourseSetting(g){return courseOf(g)!=="normal"||!!g?.drink||!!pointOf(g)||!!g?.limit2h}
+function courseLabel(g,short){return COURSES[courseOf(g)].label+(g?.drink&&!COURSES[courseOf(g)].drink?(short?" +飲":"＋飲み放題"):"")+(g?.dessert_plate&&!short?"＋デザートプレート":"")}
+function hasCourseSetting(g){return courseOf(g)!=="normal"||!!g?.drink||!!pointOf(g)||!!g?.limit2h||!!g?.dessert_plate}
 // skipの項目も、記録済み（追加注文）なら通常どおり扱う。unlock＝この項目が記録されたら使えるようにする
 function stepAvailable(g,col){
   const c=COURSES[courseOf(g)];
@@ -97,7 +102,8 @@ function stepAvailable(g,col){
   const key=c.unlock?.[col];
   return !!(key&&g?.[key]);
 }
-function extraStepsFor(g){return EXTRA_STEPS.filter(e=>e.drink?drinkOn(g):e.courses.includes(courseOf(g)))}
+function extraStepsFor(g){return EXTRA_STEPS.filter(e=>e.drink?drinkOn(g):e.plate?!!g?.dessert_plate:e.courses.includes(courseOf(g)))}
+function plateCleanupDue(g){return !!(g?.dessert_plate&&g.closing_finish_at&&!g.cleanup_at&&!g.plate_at&&!g.checkout_at&&Date.now()-new Date(g.closing_finish_at).getTime()>=PLATE_CLEANUP_MS)}
 function courseSequence(g){
   const extras=extraStepsFor(g),seq=[];
   for(const [,c] of STEP_DEFS){if(stepAvailable(g,c))seq.push(c);for(const e of extras)if(e.after===c)seq.push(e.col)}
@@ -120,7 +126,7 @@ function potWarn(g){return elapsedWarn(g,"pot_warm_at","pot_finish_at",330000)}
 function arrivalWarn(g){return !!(g?.arrival_at&&!g.checkout_at&&(Date.now()-new Date(g.arrival_at).getTime()>=6300000))}
 function nineMinWarn(g,col){
   if(!g||!NINE_MIN_STEPS.has(col))return false;
-  const seq=courseSequence(g),i=seq.indexOf(col);
+  const seq=courseSequence(g).filter(c=>!PLATE_COLS.has(c)),i=seq.indexOf(col);
   return i>0?elapsedWarn(g,seq[i-1],col,540000):false;
 }
 function labelHtml(step){
@@ -129,7 +135,9 @@ function labelHtml(step){
     .replace("〆作り終わり","〆作り<br>終わり")
     .replace("あがりおしぼり","あがり<br>おしぼり")
     .replace("飲み放題開始","飲み放題<br>開始")
-    .replace("食後デザート","食後<br>デザート");
+    .replace("食後デザート","食後<br>デザート")
+    .replace("デザプレ前の片付け","デザプレ前<br>の片付け")
+    .replace("デザートプレート","デザート<br>プレート");
 }
 function tableLabel(g){return [...g.linked_tables].sort((a,b)=>a-b).join("・")+"卓"}
 
@@ -151,7 +159,7 @@ let courseTarget=null,courseDraft=null;
 function openCourse(g){
   if(!g)return;
   courseTarget=g;
-  courseDraft={course:courseOf(g),drink:!!g.drink,point:pointOf(g),limit:!!g.limit2h};
+  courseDraft={course:courseOf(g),drink:!!g.drink,point:pointOf(g),limit:!!g.limit2h,dessert_plate:!!g.dessert_plate};
   document.getElementById("courseTitle").textContent=tableLabel(g)+"のコース";
   renderCourseDialog();
   document.getElementById("courseDialog").showModal();
@@ -172,6 +180,9 @@ function renderCourseDialog(){
   const lt=document.getElementById("limitToggle");
   lt.className="drink-toggle limit-toggle"+(courseDraft.limit?" on":"");
   lt.textContent="2時間制（入れ替えあり）："+(courseDraft.limit?"あり（タップで外す）":"なし（タップで付ける）");
+  const pt=document.getElementById("plateToggle");
+  pt.className="drink-toggle plate-toggle"+(courseDraft.dessert_plate?" on":"");
+  pt.textContent="デザートプレート："+(courseDraft.dessert_plate?"あり（タップで外す）":"なし（タップで付ける）");
   const pb=document.getElementById("pointChoices");pb.innerHTML="";
   for(const [key,label] of [[null,"なし"],...Object.entries(POINT_SHORT)]){
     const b=document.createElement("button");b.type="button";
@@ -183,6 +194,10 @@ function renderCourseDialog(){
 function toggleDraftDrink(){
   if(!courseDraft||COURSES[courseDraft.course].drink)return;
   courseDraft.drink=!courseDraft.drink;renderCourseDialog();
+}
+function toggleDraftPlate(){
+  if(!courseDraft)return;
+  courseDraft.dessert_plate=!courseDraft.dessert_plate;renderCourseDialog();
 }
 function toggleDraftLimit(){
   if(!courseDraft)return;
@@ -197,6 +212,7 @@ function saveCourse(){
   for(const [,c] of lost)g[c]=null;
   g.course=courseDraft.course;g.drink=courseDraft.drink;
   g.point=courseDraft.point;
+  g.dessert_plate=courseDraft.dessert_plate;
   if(!!g.limit2h!==courseDraft.limit){g.limit2h=courseDraft.limit;g.limit_alerted_at=null}
   if(!g.drink_start_at)g.drink_lo_alerted_at=null;
   save();render();
@@ -352,7 +368,7 @@ function skippedButton(g,label,col){
 function stepButton(g,label,col){
   const b=document.createElement("button");b.type="button";
   const pt=col==="checkout_at"&&pointOf(g);
-  b.className="step"+(g?.[col]?" done":"")+((col==="pot_finish_at"&&potWarn(g))||nineMinWarn(g,col)?" warn":"")+(pt?" point"+(pointDue(g)?" point-due":""):"");
+  b.className="step"+(g?.[col]?" done":"")+((col==="pot_finish_at"&&potWarn(g))||nineMinWarn(g,col)||(col==="cleanup_at"&&plateCleanupDue(g))?" warn":"")+(pt?" point"+(pointDue(g)?" point-due":""):"");
   b.innerHTML="<span>"+labelHtml(label)+"</span>"+(pt?"<span class='pt'>"+POINT_SHORT[pt]+"P</span>":"")+(g?.[col]?"<span class='t'>"+fmtTime(g[col])+"</span>":"");
   b.onclick=()=>recordStep(g,col);
   return b;
@@ -706,6 +722,9 @@ function checkPotAlerts(){
     if(g.pot_warm_at&&!g.pot_finish_at&&!g.checkout_at&&(Date.now()-new Date(g.pot_warm_at).getTime()>=330000)&&g.pot_warm_alerted_at!==g.pot_warm_at){
       if(sendPotAlert(g)){g.pot_warm_alerted_at=g.pot_warm_at;changed=true}
     }
+    if(plateCleanupDue(g)&&g.plate_alerted_at!==g.closing_finish_at){
+      if(sendAlert("デザートプレート前の片付け",tableLabel(g)+"：〆から5分たちました。デザートプレートの前に机の上を片付けてください","plate-"+g.id)){g.plate_alerted_at=g.closing_finish_at;changed=true}
+    }
     if(limitSoon(g)&&g.limit_alerted_at!==g.arrival_at){
       if(sendAlert("退店5分前",tableLabel(g)+"は2時間制です。退店時刻 "+fmtTime(limitEndAt(g)),"limit-"+g.id)){g.limit_alerted_at=g.arrival_at;changed=true}
     }
@@ -763,6 +782,14 @@ async function testToiletAlert(){
   document.getElementById("testToolsDialog").close();
   sendAlert("トイレチェック","トイレチェックのテストです","toilet-test","gentle");
 }
+async function testPlateAlert(){
+  if(!alertEnabled())setAlertEnabled(true);
+  await unlockAudio();
+  await requestNotificationPermission();
+  state=freshState();
+  const g=state.groups[3];g.dessert_plate=true;g.arrival_at=ago(80*60*1000);g.closing_order_at=ago(15*60*1000);g.closing_finish_at=ago(6*60*1000);
+  save();document.getElementById("testToolsDialog").close();checkPotAlerts();render();
+}
 async function testLimitAlert(){
   if(!alertEnabled())setAlertEnabled(true);
   await unlockAudio();
@@ -785,6 +812,7 @@ document.getElementById("alertToggle").onclick=toggleAlerts;
 document.getElementById("stopAlertBtn").onclick=stopAlertSound;
 document.getElementById("drinkToggle").onclick=toggleDraftDrink;
 document.getElementById("limitToggle").onclick=toggleDraftLimit;
+document.getElementById("plateToggle").onclick=toggleDraftPlate;
 document.getElementById("courseSaveBtn").onclick=saveCourse;
 document.getElementById("testAlertBtn").onclick=testPotAlert;
 document.getElementById("testToolsBtn").onclick=openTestTools;
@@ -794,6 +822,7 @@ document.getElementById("testPotBtn").onclick=testPotAlert;
 document.getElementById("testResetBtn").onclick=testReset;
 document.getElementById("testToiletBtn").onclick=testToiletAlert;
 document.getElementById("testLimitBtn").onclick=testLimitAlert;
+document.getElementById("testPlateBtn").onclick=testPlateAlert;
 document.getElementById("testPointBtn").onclick=testPointBanner;
 document.getElementById("testDrinkBtn").onclick=testDrinkAlert;
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.close).close());
